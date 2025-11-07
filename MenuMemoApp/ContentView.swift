@@ -1,25 +1,31 @@
 import SwiftUI
 
 struct ContentView: View {
-    @AppStorage("memoText") private var memoText: String = ""
-    
+    @State private var text: String = ""
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Quick Memo")
-                .font(.headline)
-            
-            TextEditor(text: $memoText)
-                .frame(width: 250, height: 150)
-                .border(Color.gray.opacity(0.3))
-            
+        VStack(spacing: 0) {
+            // テキストエリアがウィンドウ全体を使うように設定
+            TextEditor(text: $text)
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.textBackgroundColor))
+                .font(.system(size: 14))
+
+            // 下部に Clear ボタンを配置
             HStack {
                 Spacer()
                 Button("Clear") {
-                    memoText = ""
+                    text = ""
                 }
-                .keyboardShortcut("c", modifiers: .command)
+                .padding()
             }
+            .background(Color(NSColor.windowBackgroundColor))
         }
-        .padding(12)
+        .frame(minWidth: 300, minHeight: 200)
     }
+}
+
+#Preview {
+    ContentView()
 }
