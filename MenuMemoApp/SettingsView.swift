@@ -141,7 +141,7 @@ struct SettingsView: View {
                 }
                 Button("キャンセル", role: .cancel) { pendingDeleteID = nil }
             } message: { id in
-                Text("「\((id as NSString).deletingPathExtension)」をゴミ箱に移動します。")
+                Text("「\(MemoEntry.displayName(for: id))」をゴミ箱に移動します。")
             }
         }
     }

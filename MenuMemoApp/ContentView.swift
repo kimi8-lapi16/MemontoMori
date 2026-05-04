@@ -123,7 +123,7 @@ struct ContentView: View {
     }
 
     private func footerLabel(for id: String) -> String {
-        let name = (id as NSString).deletingPathExtension
+        let name = MemoEntry.displayName(for: id)
         let prefix = rotation.mode == .rotating ? "ローテーション中" : "編集中"
         return "\(prefix): \(name)"
     }

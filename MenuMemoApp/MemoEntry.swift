@@ -10,6 +10,10 @@ struct MemoEntry: Identifiable, Codable, Equatable {
     }
 
     var displayName: String {
-        (id as NSString).deletingPathExtension
+        Self.displayName(for: id)
+    }
+
+    static func displayName(for id: String) -> String {
+        URL(fileURLWithPath: id).deletingPathExtension().lastPathComponent
     }
 }
