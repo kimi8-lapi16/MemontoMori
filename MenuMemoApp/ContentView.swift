@@ -2,37 +2,168 @@ import SwiftUI
 import AppKit
 
 struct ContentView: View {
-    @State private var text: String = ""
+    @EnvironmentObject private var store: MemoStore
+    @EnvironmentObject private var rotation: RotationController
+
     @State private var isPinned: Bool = false
+    @State private var freeMemoText: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
-            // テキストエリアがウィンドウ全体を使うように設定
-            TextEditor(text: $text)
-                .padding()
+            mainArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            footer
+                .background(Color(NSColor.windowBackgroundColor))
+        }
+        .frame(minWidth: 320, minHeight: 220)
+        .background(WindowAccessor(isPinned: $isPinned))
+    }
+
+    @ViewBuilder
+    private var mainArea: some View {
+        if store.entries.isEmpty {
+            TextEditor(text: $freeMemoText)
+                .padding()
                 .background(Color(NSColor.textBackgroundColor))
                 .font(.system(size: 14))
-
-            // 下部にピン留めトグルと Clear ボタンを配置
-            HStack {
-                Button(action: { isPinned.toggle() }) {
-                    Image(systemName: isPinned ? "pin.fill" : "pin")
-                }
-                .help(isPinned ? "最前面表示を解除" : "常に最前面に表示")
-                .buttonStyle(.borderless)
-                .padding(.leading)
-
-                Spacer()
-                Button("Clear") {
-                    text = ""
-                }
-                .padding()
+        } else if let id = rotation.currentID {
+            FileMemoEditor(id: id)
+                .id(id)
+        } else {
+            VStack(spacing: 8) {
+                Image(systemName: "note.text")
+                    .font(.largeTitle)
+                    .foregroundColor(.secondary)
+                Text("有効なメモがありません")
+                    .foregroundColor(.secondary)
+                Text("設定から表示するメモを選択してください")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .background(Color(NSColor.windowBackgroundColor))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.textBackgroundColor))
         }
-        .frame(minWidth: 300, minHeight: 200)
-        .background(WindowAccessor(isPinned: $isPinned))
+    }
+
+    private var footer: some View {
+        HStack(spacing: 8) {
+            pinButton
+
+            if !store.entries.isEmpty {
+                Button {
+                    rotation.advance(by: -1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .buttonStyle(.borderless)
+                .disabled(store.enabledEntries.count < 2)
+                .help("前のメモへ")
+            }
+
+            Spacer()
+
+            if !store.entries.isEmpty, let id = rotation.currentID {
+                Text(footerLabel(for: id))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer()
+
+            if !store.entries.isEmpty {
+                Button {
+                    rotation.advance(by: 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .buttonStyle(.borderless)
+                .disabled(store.enabledEntries.count < 2)
+                .help("次のメモへ")
+            }
+
+            if store.entries.isEmpty {
+                Button("Clear") { freeMemoText = "" }
+            }
+
+            settingsButton
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+    }
+
+    private var pinButton: some View {
+        Button {
+            isPinned.toggle()
+        } label: {
+            Image(systemName: isPinned ? "pin.fill" : "pin")
+        }
+        .buttonStyle(.borderless)
+        .help(isPinned ? "最前面表示を解除" : "常に最前面に表示")
+    }
+
+    private var settingsButton: some View {
+        Button {
+            openSettings()
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .buttonStyle(.borderless)
+        .help("設定を開く")
+    }
+
+    private func openSettings() {
+        if #available(macOS 14, *) {
+            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        } else {
+            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
+    }
+
+    private func footerLabel(for id: String) -> String {
+        let name = (id as NSString).deletingPathExtension
+        let prefix = rotation.mode == .rotating ? "ローテーション中" : "編集中"
+        return "\(prefix): \(name)"
+    }
+}
+
+private struct FileMemoEditor: View {
+    let id: String
+
+    @EnvironmentObject private var store: MemoStore
+    @EnvironmentObject private var rotation: RotationController
+
+    @State private var text: String = ""
+    @State private var didLoad: Bool = false
+
+    var body: some View {
+        TextEditor(text: $text)
+            .padding()
+            .background(Color(NSColor.textBackgroundColor))
+            .font(.system(size: 14))
+            .onAppear { loadIfNeeded() }
+            .onChange(of: text) { _, newValue in
+                handleTextChange(newValue)
+            }
+            .onDisappear {
+                store.flushPending()
+            }
+    }
+
+    private func loadIfNeeded() {
+        guard !didLoad else { return }
+        text = store.read(id: id)
+        didLoad = true
+    }
+
+    private func handleTextChange(_ newValue: String) {
+        guard didLoad else { return }
+        if rotation.mode == .rotating {
+            rotation.enterEditingMode()
+        }
+        store.scheduleWrite(id: id, content: newValue)
     }
 }
 
@@ -58,5 +189,8 @@ private struct WindowAccessor: NSViewRepresentable {
 }
 
 #Preview {
+    let store = MemoStore()
     ContentView()
+        .environmentObject(store)
+        .environmentObject(RotationController(store: store))
 }
