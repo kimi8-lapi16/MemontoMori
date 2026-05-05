@@ -105,21 +105,11 @@ struct ContentView: View {
     }
 
     private var settingsButton: some View {
-        Button {
-            openSettings()
-        } label: {
+        SettingsLink {
             Image(systemName: "gearshape")
         }
         .buttonStyle(.borderless)
         .help("設定を開く")
-    }
-
-    private func openSettings() {
-        if #available(macOS 14, *) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-        }
     }
 
     private func footerLabel(for id: String) -> String {
