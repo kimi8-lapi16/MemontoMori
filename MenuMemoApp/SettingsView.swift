@@ -73,7 +73,12 @@ struct SettingsView: View {
             }
         }
         .padding()
-        .frame(minWidth: 520, minHeight: 460)
+        .frame(
+            minWidth: 520,
+            maxWidth: .infinity,
+            minHeight: 460,
+            maxHeight: .infinity
+        )
         .onAppear {
             store.rescan()
             rotation.reconcile()

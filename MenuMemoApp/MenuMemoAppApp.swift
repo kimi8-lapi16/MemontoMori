@@ -28,5 +28,6 @@ struct MenuMemoAppApp: App {
         Settings {
             SettingsView(store: store, rotation: rotation)
         }
+        .windowResizability(.contentMinSize)
     }
 }
