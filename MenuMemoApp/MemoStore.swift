@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import SwiftUI
+import Combine
 
 final class MemoStore: ObservableObject {
     static let directoryName = "MemontoMori"

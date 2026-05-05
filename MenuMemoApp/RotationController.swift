@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import SwiftUI
+import Combine
 
 final class RotationController: ObservableObject {
     enum Mode: Equatable {
