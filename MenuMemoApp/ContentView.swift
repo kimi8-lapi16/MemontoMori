@@ -127,6 +127,7 @@ private struct FileMemoEditor: View {
 
     @State private var text: String = ""
     @State private var didLoad: Bool = false
+    @State private var skipNextChange: Bool = false
 
     var body: some View {
         TextEditor(text: $text)
@@ -144,12 +145,20 @@ private struct FileMemoEditor: View {
 
     private func loadIfNeeded() {
         guard !didLoad else { return }
-        text = store.read(id: id)
+        let content = store.read(id: id)
+        if content != text {
+            skipNextChange = true
+        }
+        text = content
         didLoad = true
     }
 
     private func handleTextChange(_ newValue: String) {
         guard didLoad else { return }
+        if skipNextChange {
+            skipNextChange = false
+            return
+        }
         if rotation.mode == .rotating {
             rotation.enterEditingMode()
         }
