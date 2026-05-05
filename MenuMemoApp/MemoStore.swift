@@ -2,7 +2,6 @@ import Foundation
 import AppKit
 import SwiftUI
 
-@MainActor
 final class MemoStore: ObservableObject {
     static let directoryName = "MemontoMori"
     static let supportedExtensions: Set<String> = ["txt", "md"]

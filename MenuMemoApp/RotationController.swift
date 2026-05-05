@@ -2,7 +2,6 @@ import Foundation
 import AppKit
 import SwiftUI
 
-@MainActor
 final class RotationController: ObservableObject {
     enum Mode: Equatable {
         case editing
