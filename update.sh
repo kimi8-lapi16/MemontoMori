@@ -4,8 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 APP_NAME="MemontoMori"
-PROJECT="MenuMemoApp.xcodeproj"
-SCHEME="MenuMemoApp"
+PROJECT="MemontoMori.xcodeproj"
+SCHEME="MemontoMori"
 DERIVED="./build"
 RELEASE_APP="${DERIVED}/Build/Products/Release/${APP_NAME}.app"
 INSTALL_PATH="/Applications/${APP_NAME}.app"

@@ -7,13 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		30946D002EBE472200C24B26 /* MenuMemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MenuMemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		30946D002EBE472200C24B26 /* MemontoMori.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemontoMori.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		30946D022EBE472200C24B26 /* MenuMemoApp */ = {
+		30946D022EBE472200C24B26 /* MemontoMori */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MenuMemoApp;
+			path = MemontoMori;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,7 +32,7 @@
 		30946CF72EBE472200C24B26 = {
 			isa = PBXGroup;
 			children = (
-				30946D022EBE472200C24B26 /* MenuMemoApp */,
+				30946D022EBE472200C24B26 /* MemontoMori */,
 				30946D012EBE472200C24B26 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -40,7 +40,7 @@
 		30946D012EBE472200C24B26 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				30946D002EBE472200C24B26 /* MenuMemoApp.app */,
+				30946D002EBE472200C24B26 /* MemontoMori.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		30946CFF2EBE472200C24B26 /* MenuMemoApp */ = {
+		30946CFF2EBE472200C24B26 /* MemontoMori */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 30946D0B2EBE472400C24B26 /* Build configuration list for PBXNativeTarget "MenuMemoApp" */;
+			buildConfigurationList = 30946D0B2EBE472400C24B26 /* Build configuration list for PBXNativeTarget "MemontoMori" */;
 			buildPhases = (
 				30946CFC2EBE472200C24B26 /* Sources */,
 				30946CFD2EBE472200C24B26 /* Frameworks */,
@@ -61,13 +61,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				30946D022EBE472200C24B26 /* MenuMemoApp */,
+				30946D022EBE472200C24B26 /* MemontoMori */,
 			);
-			name = MenuMemoApp;
+			name = MemontoMori;
 			packageProductDependencies = (
 			);
-			productName = MenuMemoApp;
-			productReference = 30946D002EBE472200C24B26 /* MenuMemoApp.app */;
+			productName = MemontoMori;
+			productReference = 30946D002EBE472200C24B26 /* MemontoMori.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 30946CFB2EBE472200C24B26 /* Build configuration list for PBXProject "MenuMemoApp" */;
+			buildConfigurationList = 30946CFB2EBE472200C24B26 /* Build configuration list for PBXProject "MemontoMori" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				30946CFF2EBE472200C24B26 /* MenuMemoApp */,
+				30946CFF2EBE472200C24B26 /* MemontoMori */,
 			);
 		};
 /* End PBXProject section */
@@ -264,7 +264,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "kimi8-lapi16.MenuMemoApp";
+				PRODUCT_BUNDLE_IDENTIFIER = "kimi8-lapi16.MemontoMori";
 				PRODUCT_NAME = MemontoMori;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -297,7 +297,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "kimi8-lapi16.MenuMemoApp";
+				PRODUCT_BUNDLE_IDENTIFIER = "kimi8-lapi16.MemontoMori";
 				PRODUCT_NAME = MemontoMori;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -312,7 +312,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		30946CFB2EBE472200C24B26 /* Build configuration list for PBXProject "MenuMemoApp" */ = {
+		30946CFB2EBE472200C24B26 /* Build configuration list for PBXProject "MemontoMori" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				30946D092EBE472400C24B26 /* Debug */,
@@ -321,7 +321,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		30946D0B2EBE472400C24B26 /* Build configuration list for PBXNativeTarget "MenuMemoApp" */ = {
+		30946D0B2EBE472400C24B26 /* Build configuration list for PBXNativeTarget "MemontoMori" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				30946D0C2EBE472400C24B26 /* Debug */,
