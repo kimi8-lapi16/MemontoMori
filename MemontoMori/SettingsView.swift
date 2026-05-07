@@ -6,6 +6,8 @@ struct SettingsView: View {
 
     @State private var showingNewMemoSheet: Bool = false
     @State private var newMemoName: String = ""
+    @State private var showingNewFolderSheet: Bool = false
+    @State private var newFolderName: String = ""
     @State private var errorMessage: String?
     @State private var pendingDeleteID: String?
 
@@ -30,6 +32,8 @@ struct SettingsView: View {
                     .truncationMode(.middle)
             }
 
+            folderPicker
+
             fileList
                 .frame(minHeight: 180)
 
@@ -39,6 +43,12 @@ struct SettingsView: View {
                     showingNewMemoSheet = true
                 } label: {
                     Label("新規メモを作成", systemImage: "plus")
+                }
+                Button {
+                    newFolderName = ""
+                    showingNewFolderSheet = true
+                } label: {
+                    Label("新規フォルダを作成", systemImage: "folder.badge.plus")
                 }
                 Button {
                     store.revealInFinder()
@@ -86,6 +96,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showingNewMemoSheet) {
             newMemoSheet
         }
+        .sheet(isPresented: $showingNewFolderSheet) {
+            newFolderSheet
+        }
         .alert(
             "エラー",
             isPresented: Binding(
@@ -97,6 +110,33 @@ struct SettingsView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+
+    private var folderPicker: some View {
+        HStack {
+            Picker(
+                "フォルダ",
+                selection: Binding(
+                    get: { store.currentSubdirectory },
+                    set: { newValue in
+                        store.selectSubdirectory(newValue)
+                        rotation.reconcile()
+                    }
+                )
+            ) {
+                Text("（ルート）").tag("")
+                ForEach(store.availableSubdirectories, id: \.self) { dir in
+                    Text(folderPickerLabel(for: dir)).tag(dir)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+    }
+
+    private func folderPickerLabel(for relativePath: String) -> String {
+        let depth = relativePath.split(separator: "/").count - 1
+        let leaf = relativePath.split(separator: "/").last.map(String.init) ?? relativePath
+        return String(repeating: "  ", count: max(depth, 0)) + leaf
     }
 
     @ViewBuilder
@@ -158,6 +198,9 @@ struct SettingsView: View {
             Text("拡張子を省略すると .md として作成されます。")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            Text("作成先: \(currentLocationLabel)")
+                .font(.caption)
+                .foregroundColor(.secondary)
             TextField("ファイル名", text: $newMemoName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 320)
@@ -178,12 +221,55 @@ struct SettingsView: View {
         .padding()
     }
 
+    private var newFolderSheet: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("新規フォルダ")
+                .font(.headline)
+            Text("作成先: \(currentLocationLabel)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            TextField("フォルダ名", text: $newFolderName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 320)
+            HStack {
+                Spacer()
+                Button("キャンセル") {
+                    showingNewFolderSheet = false
+                    newFolderName = ""
+                }
+                .keyboardShortcut(.cancelAction)
+                Button("作成") {
+                    createFolder()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding()
+    }
+
+    private var currentLocationLabel: String {
+        store.currentSubdirectory.isEmpty ? "（ルート）" : store.currentSubdirectory
+    }
+
     private func createMemo() {
         let result = store.createMemo(name: newMemoName)
         switch result {
         case .success:
             showingNewMemoSheet = false
             newMemoName = ""
+            rotation.reconcile()
+        case .failure(let error):
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func createFolder() {
+        let result = store.createSubdirectory(name: newFolderName)
+        switch result {
+        case .success:
+            showingNewFolderSheet = false
+            newFolderName = ""
             rotation.reconcile()
         case .failure(let error):
             errorMessage = error.localizedDescription
