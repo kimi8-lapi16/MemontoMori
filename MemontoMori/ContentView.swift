@@ -50,6 +50,8 @@ struct ContentView: View {
         HStack(spacing: 8) {
             pinButton
 
+            Spacer()
+
             if !store.entries.isEmpty {
                 Button {
                     rotation.advance(by: -1)
@@ -61,17 +63,14 @@ struct ContentView: View {
                 .help("前のメモへ")
             }
 
-            Spacer()
-
             if !store.entries.isEmpty, let id = rotation.currentID {
                 Text(footerLabel(for: id))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .frame(width: 140)
             }
-
-            Spacer()
 
             if !store.entries.isEmpty {
                 Button {
@@ -83,6 +82,8 @@ struct ContentView: View {
                 .disabled(store.enabledEntries.count < 2)
                 .help("次のメモへ")
             }
+
+            Spacer()
 
             if store.entries.isEmpty {
                 Button("Clear") { freeMemoText = "" }
@@ -114,8 +115,8 @@ struct ContentView: View {
 
     private func footerLabel(for id: String) -> String {
         let name = MemoEntry.displayName(for: id)
-        let prefix = rotation.mode == .rotating ? "ローテーション中" : "編集中"
-        return "\(prefix): \(name)"
+        let prefix = rotation.mode == .rotating ? "🔄" : "✏️"
+        return "\(prefix) \(name)"
     }
 }
 
