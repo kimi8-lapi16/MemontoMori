@@ -7,12 +7,20 @@ final class MemoStore: ObservableObject {
     static let directoryName = "MemontoMori"
     static let supportedExtensions: Set<String> = ["txt", "md"]
 
-    private static let entriesKey = "memontoMori.entries"
     private static let intervalKey = "memontoMori.rotationInterval"
     private static let idleKey = "memontoMori.idleTimeout"
-    private static let lastIDKey = "memontoMori.lastDisplayedID"
+    private static let subdirKey = "memontoMori.currentSubdirectory"
+
+    private static func entriesKey(for subdir: String) -> String {
+        subdir.isEmpty ? "memontoMori.entries" : "memontoMori.entries.\(subdir)"
+    }
+
+    private static func lastIDKey(for subdir: String) -> String {
+        subdir.isEmpty ? "memontoMori.lastDisplayedID" : "memontoMori.lastDisplayedID.\(subdir)"
+    }
 
     @Published private(set) var entries: [MemoEntry] = []
+    @Published private(set) var availableSubdirectories: [String] = []
 
     @Published var rotationInterval: TimeInterval {
         didSet { UserDefaults.standard.set(rotationInterval, forKey: Self.intervalKey) }
@@ -23,10 +31,22 @@ final class MemoStore: ObservableObject {
     }
 
     @Published var lastDisplayedID: String? {
-        didSet { UserDefaults.standard.set(lastDisplayedID, forKey: Self.lastIDKey) }
+        didSet {
+            UserDefaults.standard.set(lastDisplayedID, forKey: Self.lastIDKey(for: currentSubdirectory))
+        }
     }
 
-    let directoryURL: URL
+    @Published private(set) var currentSubdirectory: String {
+        didSet { UserDefaults.standard.set(currentSubdirectory, forKey: Self.subdirKey) }
+    }
+
+    let rootDirectoryURL: URL
+
+    var directoryURL: URL {
+        currentSubdirectory.isEmpty
+            ? rootDirectoryURL
+            : rootDirectoryURL.appendingPathComponent(currentSubdirectory, isDirectory: true)
+    }
 
     private var pendingWrites: [String: String] = [:]
     private var debounceTask: Task<Void, Never>?
@@ -34,14 +54,24 @@ final class MemoStore: ObservableObject {
     init() {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents")
-        self.directoryURL = documents.appendingPathComponent(Self.directoryName, isDirectory: true)
+        let root = documents.appendingPathComponent(Self.directoryName, isDirectory: true)
+        self.rootDirectoryURL = root
 
         let defaults = UserDefaults.standard
-        let storedInterval = defaults.object(forKey: Self.intervalKey) as? TimeInterval
-        let storedIdle = defaults.object(forKey: Self.idleKey) as? TimeInterval
-        self.rotationInterval = storedInterval ?? 600
-        self.idleTimeout = storedIdle ?? 600
-        self.lastDisplayedID = defaults.string(forKey: Self.lastIDKey)
+        self.rotationInterval = (defaults.object(forKey: Self.intervalKey) as? TimeInterval) ?? 600
+        self.idleTimeout = (defaults.object(forKey: Self.idleKey) as? TimeInterval) ?? 600
+
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let dirs = Self.scanSubdirectories(root: root)
+        var storedSubdir = defaults.string(forKey: Self.subdirKey) ?? ""
+        if !storedSubdir.isEmpty && !dirs.contains(storedSubdir) {
+            storedSubdir = ""
+        }
+
+        self.availableSubdirectories = dirs
+        self.currentSubdirectory = storedSubdir
+        self.lastDisplayedID = defaults.string(forKey: Self.lastIDKey(for: storedSubdir))
 
         ensureDirectoryExists()
         rescan()
@@ -52,6 +82,15 @@ final class MemoStore: ObservableObject {
     }
 
     func rescan() {
+        try? FileManager.default.createDirectory(at: rootDirectoryURL, withIntermediateDirectories: true)
+        refreshAvailableSubdirectories()
+
+        // フォルダが Finder などで削除された場合はルートにフォールバックする
+        if !currentSubdirectory.isEmpty && !availableSubdirectories.contains(currentSubdirectory) {
+            currentSubdirectory = ""
+            lastDisplayedID = UserDefaults.standard.string(forKey: Self.lastIDKey(for: ""))
+        }
+
         ensureDirectoryExists()
 
         let stored = loadStoredEntries()
@@ -180,8 +219,78 @@ final class MemoStore: ObservableObject {
         entries.filter { $0.isEnabled }
     }
 
+    // MARK: - Subdirectories
+
+    func selectSubdirectory(_ relativePath: String) {
+        let target = relativePath
+        if target == currentSubdirectory { return }
+        if !target.isEmpty && !availableSubdirectories.contains(target) { return }
+
+        flushPending()
+        currentSubdirectory = target
+        ensureDirectoryExists()
+        lastDisplayedID = UserDefaults.standard.string(forKey: Self.lastIDKey(for: target))
+        rescan()
+    }
+
+    @discardableResult
+    func createSubdirectory(name: String) -> Result<String, Error> {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .failure(MemoStoreError.emptyName)
+        }
+        guard !trimmed.contains("/"), !trimmed.contains("\\"),
+              trimmed != ".", trimmed != "..", !trimmed.hasPrefix(".") else {
+            return .failure(MemoStoreError.invalidName)
+        }
+
+        let parent = directoryURL
+        let url = parent.appendingPathComponent(trimmed, isDirectory: true)
+        if FileManager.default.fileExists(atPath: url.path) {
+            return .failure(MemoStoreError.alreadyExists)
+        }
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+            refreshAvailableSubdirectories()
+            let newRel = currentSubdirectory.isEmpty ? trimmed : currentSubdirectory + "/" + trimmed
+            selectSubdirectory(newRel)
+            return .success(newRel)
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    func refreshAvailableSubdirectories() {
+        availableSubdirectories = Self.scanSubdirectories(root: rootDirectoryURL)
+    }
+
+    private static func scanSubdirectories(root: URL) -> [String] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        let rootPath = root.standardizedFileURL.path
+        var result: [String] = []
+        for case let url as URL in enumerator {
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            guard isDir else { continue }
+            let path = url.standardizedFileURL.path
+            guard path.hasPrefix(rootPath) else { continue }
+            var rel = String(path.dropFirst(rootPath.count))
+            if rel.hasPrefix("/") { rel.removeFirst() }
+            if !rel.isEmpty {
+                result.append(rel)
+            }
+        }
+        result.sort()
+        return result
+    }
+
     private func loadStoredEntries() -> [MemoEntry] {
-        guard let data = UserDefaults.standard.data(forKey: Self.entriesKey),
+        guard let data = UserDefaults.standard.data(forKey: Self.entriesKey(for: currentSubdirectory)),
               let decoded = try? JSONDecoder().decode([MemoEntry].self, from: data) else {
             return []
         }
@@ -190,7 +299,7 @@ final class MemoStore: ObservableObject {
 
     private func saveEntries() {
         if let data = try? JSONEncoder().encode(entries) {
-            UserDefaults.standard.set(data, forKey: Self.entriesKey)
+            UserDefaults.standard.set(data, forKey: Self.entriesKey(for: currentSubdirectory))
         }
     }
 }
@@ -202,9 +311,9 @@ enum MemoStoreError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .emptyName: return "ファイル名が空です"
-        case .invalidName: return "ファイル名に / は使えません"
-        case .alreadyExists: return "同名のファイルがすでに存在します"
+        case .emptyName: return "名前が空です"
+        case .invalidName: return "名前に / や . から始まる名前は使えません"
+        case .alreadyExists: return "同名の項目がすでに存在します"
         }
     }
 }

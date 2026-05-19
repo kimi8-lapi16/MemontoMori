@@ -60,12 +60,13 @@ final class RotationController: ObservableObject {
 
     func reconcile() {
         let ids = store.entries.map(\.id)
-        if let cur = currentID, !ids.contains(cur) {
-            currentID = store.enabledEntries.first?.id ?? store.entries.first?.id
-            store.lastDisplayedID = currentID
-        }
-        if currentID == nil {
-            currentID = store.enabledEntries.first?.id ?? store.entries.first?.id
+        let currentValid = currentID.map { ids.contains($0) } ?? false
+        if !currentValid {
+            if let last = store.lastDisplayedID, ids.contains(last) {
+                currentID = last
+            } else {
+                currentID = store.enabledEntries.first?.id ?? store.entries.first?.id
+            }
             store.lastDisplayedID = currentID
         }
         if store.enabledEntries.isEmpty {
