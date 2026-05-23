@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 @main
 struct MemontoMoriApp: App {
@@ -24,10 +25,21 @@ struct MemontoMoriApp: App {
                 .environmentObject(store)
                 .environmentObject(rotation)
         }
-
-        Settings {
-            SettingsView(store: store, rotation: rotation)
-        }
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("設定...") {
+                    activateMainWindow()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
+    }
+
+    private func activateMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.windows.first {
+            window.makeKeyAndOrderFront(nil)
+        }
     }
 }

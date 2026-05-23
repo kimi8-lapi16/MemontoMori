@@ -16,11 +16,13 @@ final class RotationController: ObservableObject {
     private var idleTimer: Timer?
     private var rotationTimer: Timer?
     private var eventMonitor: Any?
+    private var cancellables: Set<AnyCancellable> = []
 
     init(store: MemoStore) {
         self.store = store
         self.currentID = Self.resolveInitialID(store: store)
         installEventMonitor()
+        observeRotationEnabled()
         scheduleIdleTimer()
     }
 
@@ -28,6 +30,24 @@ final class RotationController: ObservableObject {
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }
+    }
+
+    private func observeRotationEnabled() {
+        store.$rotationEnabled
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                if enabled {
+                    self.scheduleIdleTimer()
+                } else {
+                    self.mode = .editing
+                    self.stopRotationTimer()
+                    self.idleTimer?.invalidate()
+                    self.idleTimer = nil
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private static func resolveInitialID(store: MemoStore) -> String? {
@@ -104,6 +124,7 @@ final class RotationController: ObservableObject {
     private func scheduleIdleTimer() {
         idleTimer?.invalidate()
         idleTimer = nil
+        guard store.rotationEnabled else { return }
         guard !store.enabledEntries.isEmpty else { return }
         let timer = Timer.scheduledTimer(
             withTimeInterval: max(store.idleTimeout, 5),
@@ -118,6 +139,7 @@ final class RotationController: ObservableObject {
     }
 
     private func startRotation() {
+        guard store.rotationEnabled else { return }
         let enabled = store.enabledEntries
         guard !enabled.isEmpty else { return }
         store.flushPending()

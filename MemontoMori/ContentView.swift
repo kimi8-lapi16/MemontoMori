@@ -7,8 +7,32 @@ struct ContentView: View {
 
     @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
+    @State private var showsSettingsPanel: Bool = false
+
+    private static let settingsPanelWidth: CGFloat = 380
 
     var body: some View {
+        HStack(spacing: 0) {
+            memoColumn
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+
+            if showsSettingsPanel {
+                Divider()
+                SettingsView(store: store, rotation: rotation, embedded: true)
+                    .frame(width: Self.settingsPanelWidth)
+                    .background(Color(NSColor.windowBackgroundColor))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .frame(
+            minWidth: showsSettingsPanel ? 320 + Self.settingsPanelWidth : 320,
+            minHeight: 260
+        )
+        .background(WindowAccessor(isPinned: $isPinned))
+        .animation(.easeInOut(duration: 0.18), value: showsSettingsPanel)
+    }
+
+    private var memoColumn: some View {
         VStack(spacing: 0) {
             mainArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -16,17 +40,13 @@ struct ContentView: View {
             footer
                 .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(minWidth: 320, minHeight: 220)
-        .background(WindowAccessor(isPinned: $isPinned))
     }
 
     @ViewBuilder
     private var mainArea: some View {
         if store.entries.isEmpty {
-            TextEditor(text: $freeMemoText)
-                .padding()
+            PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
-                .font(.system(size: 14))
         } else if let id = rotation.currentID {
             FileMemoEditor(id: id)
                 .id(id)
@@ -37,7 +57,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text("有効なメモがありません")
                     .foregroundColor(.secondary)
-                Text("設定から表示するメモを選択してください")
+                Text("右のパネルから表示するメモを選択してください")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -49,6 +69,7 @@ struct ContentView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             pinButton
+            rotationToggleButton
 
             Spacer()
 
@@ -89,7 +110,7 @@ struct ContentView: View {
                 Button("Clear") { freeMemoText = "" }
             }
 
-            settingsButton
+            panelToggleButton
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
@@ -105,17 +126,39 @@ struct ContentView: View {
         .help(isPinned ? "最前面表示を解除" : "常に最前面に表示")
     }
 
-    private var settingsButton: some View {
-        SettingsLink {
-            Image(systemName: "gearshape")
+    private var rotationToggleButton: some View {
+        Button {
+            store.rotationEnabled.toggle()
+        } label: {
+            Image(
+                systemName: store.rotationEnabled
+                    ? "arrow.triangle.2.circlepath"
+                    : "arrow.triangle.2.circlepath.circle"
+            )
+            .foregroundColor(store.rotationEnabled ? .accentColor : .secondary)
         }
         .buttonStyle(.borderless)
-        .help("設定を開く")
+        .help(store.rotationEnabled ? "ローテーションをオフにする" : "ローテーションをオンにする")
+    }
+
+    private var panelToggleButton: some View {
+        Button {
+            showsSettingsPanel.toggle()
+        } label: {
+            Image(systemName: showsSettingsPanel ? "sidebar.right" : "sidebar.squares.right")
+        }
+        .buttonStyle(.borderless)
+        .help(showsSettingsPanel ? "設定パネルを閉じる" : "設定パネルを開く")
     }
 
     private func footerLabel(for id: String) -> String {
         let name = MemoEntry.displayName(for: id)
-        let prefix = rotation.mode == .rotating ? "🔄" : "✏️"
+        let prefix: String
+        if !store.rotationEnabled {
+            prefix = "⏸"
+        } else {
+            prefix = rotation.mode == .rotating ? "🔄" : "✏️"
+        }
         return "\(prefix) \(name)"
     }
 }
@@ -131,10 +174,8 @@ private struct FileMemoEditor: View {
     @State private var skipNextChange: Bool = false
 
     var body: some View {
-        TextEditor(text: $text)
-            .padding()
+        PlainTextEditor(text: $text)
             .background(Color(NSColor.textBackgroundColor))
-            .font(.system(size: 14))
             .onAppear { loadIfNeeded() }
             .onChange(of: text) { _, newValue in
                 handleTextChange(newValue)
@@ -164,6 +205,58 @@ private struct FileMemoEditor: View {
             rotation.enterEditingMode()
         }
         store.scheduleWrite(id: id, content: newValue)
+    }
+}
+
+private struct PlainTextEditor: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return scrollView
+        }
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.font = .systemFont(ofSize: 14)
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.backgroundColor = .textBackgroundColor
+        textView.drawsBackground = true
+
+        // スマートクオート (curly quote) や ハイフン→ダッシュ などの自動置換を無効化する。
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.smartInsertDeleteEnabled = false
+
+        textView.string = text
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? NSTextView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text.wrappedValue = textView.string
+        }
     }
 }
 

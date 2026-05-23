@@ -10,6 +10,7 @@ final class MemoStore: ObservableObject {
     private static let intervalKey = "memontoMori.rotationInterval"
     private static let idleKey = "memontoMori.idleTimeout"
     private static let subdirKey = "memontoMori.currentSubdirectory"
+    private static let rotationEnabledKey = "memontoMori.rotationEnabled"
 
     private static func entriesKey(for subdir: String) -> String {
         subdir.isEmpty ? "memontoMori.entries" : "memontoMori.entries.\(subdir)"
@@ -28,6 +29,10 @@ final class MemoStore: ObservableObject {
 
     @Published var idleTimeout: TimeInterval {
         didSet { UserDefaults.standard.set(idleTimeout, forKey: Self.idleKey) }
+    }
+
+    @Published var rotationEnabled: Bool {
+        didSet { UserDefaults.standard.set(rotationEnabled, forKey: Self.rotationEnabledKey) }
     }
 
     @Published var lastDisplayedID: String? {
@@ -60,6 +65,7 @@ final class MemoStore: ObservableObject {
         let defaults = UserDefaults.standard
         self.rotationInterval = (defaults.object(forKey: Self.intervalKey) as? TimeInterval) ?? 600
         self.idleTimeout = (defaults.object(forKey: Self.idleKey) as? TimeInterval) ?? 600
+        self.rotationEnabled = (defaults.object(forKey: Self.rotationEnabledKey) as? Bool) ?? true
 
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
