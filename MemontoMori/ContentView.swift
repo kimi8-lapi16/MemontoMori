@@ -7,8 +7,32 @@ struct ContentView: View {
 
     @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
+    @State private var showsSettingsPanel: Bool = false
+
+    private static let settingsPanelWidth: CGFloat = 380
 
     var body: some View {
+        HStack(spacing: 0) {
+            memoColumn
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+
+            if showsSettingsPanel {
+                Divider()
+                SettingsView(store: store, rotation: rotation, embedded: true)
+                    .frame(width: Self.settingsPanelWidth)
+                    .background(Color(NSColor.windowBackgroundColor))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .frame(
+            minWidth: showsSettingsPanel ? 320 + Self.settingsPanelWidth : 320,
+            minHeight: 260
+        )
+        .background(WindowAccessor(isPinned: $isPinned))
+        .animation(.easeInOut(duration: 0.18), value: showsSettingsPanel)
+    }
+
+    private var memoColumn: some View {
         VStack(spacing: 0) {
             mainArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -16,8 +40,6 @@ struct ContentView: View {
             footer
                 .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(minWidth: 320, minHeight: 220)
-        .background(WindowAccessor(isPinned: $isPinned))
     }
 
     @ViewBuilder
@@ -37,7 +59,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text("有効なメモがありません")
                     .foregroundColor(.secondary)
-                Text("設定から表示するメモを選択してください")
+                Text("右のパネルから表示するメモを選択してください")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -49,6 +71,7 @@ struct ContentView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             pinButton
+            rotationToggleButton
 
             Spacer()
 
@@ -89,7 +112,7 @@ struct ContentView: View {
                 Button("Clear") { freeMemoText = "" }
             }
 
-            settingsButton
+            panelToggleButton
         }
         .padding(.horizontal, 10)
         .frame(height: 32)
@@ -105,17 +128,39 @@ struct ContentView: View {
         .help(isPinned ? "最前面表示を解除" : "常に最前面に表示")
     }
 
-    private var settingsButton: some View {
-        SettingsLink {
-            Image(systemName: "gearshape")
+    private var rotationToggleButton: some View {
+        Button {
+            store.rotationEnabled.toggle()
+        } label: {
+            Image(
+                systemName: store.rotationEnabled
+                    ? "arrow.triangle.2.circlepath"
+                    : "arrow.triangle.2.circlepath.circle"
+            )
+            .foregroundColor(store.rotationEnabled ? .accentColor : .secondary)
         }
         .buttonStyle(.borderless)
-        .help("設定を開く")
+        .help(store.rotationEnabled ? "ローテーションをオフにする" : "ローテーションをオンにする")
+    }
+
+    private var panelToggleButton: some View {
+        Button {
+            showsSettingsPanel.toggle()
+        } label: {
+            Image(systemName: showsSettingsPanel ? "sidebar.right" : "sidebar.squares.right")
+        }
+        .buttonStyle(.borderless)
+        .help(showsSettingsPanel ? "設定パネルを閉じる" : "設定パネルを開く")
     }
 
     private func footerLabel(for id: String) -> String {
         let name = MemoEntry.displayName(for: id)
-        let prefix = rotation.mode == .rotating ? "🔄" : "✏️"
+        let prefix: String
+        if !store.rotationEnabled {
+            prefix = "⏸"
+        } else {
+            prefix = rotation.mode == .rotating ? "🔄" : "✏️"
+        }
         return "\(prefix) \(name)"
     }
 }

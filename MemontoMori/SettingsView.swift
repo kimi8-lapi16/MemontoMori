@@ -4,6 +4,9 @@ struct SettingsView: View {
     @ObservedObject var store: MemoStore
     @ObservedObject var rotation: RotationController
 
+    /// 埋め込み表示時はウィンドウ最小サイズの強制を外したいので、外から指定できるようにする。
+    var embedded: Bool = false
+
     @State private var showingNewMemoSheet: Bool = false
     @State private var newMemoName: String = ""
     @State private var showingNewFolderSheet: Bool = false
@@ -84,9 +87,9 @@ struct SettingsView: View {
         }
         .padding()
         .frame(
-            minWidth: 520,
+            minWidth: embedded ? 320 : 520,
             maxWidth: .infinity,
-            minHeight: 460,
+            minHeight: embedded ? 0 : 460,
             maxHeight: .infinity
         )
         .onAppear {
