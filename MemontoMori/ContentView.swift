@@ -45,10 +45,8 @@ struct ContentView: View {
     @ViewBuilder
     private var mainArea: some View {
         if store.entries.isEmpty {
-            TextEditor(text: $freeMemoText)
-                .padding()
+            PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
-                .font(.system(size: 14))
         } else if let id = rotation.currentID {
             FileMemoEditor(id: id)
                 .id(id)
@@ -176,10 +174,8 @@ private struct FileMemoEditor: View {
     @State private var skipNextChange: Bool = false
 
     var body: some View {
-        TextEditor(text: $text)
-            .padding()
+        PlainTextEditor(text: $text)
             .background(Color(NSColor.textBackgroundColor))
-            .font(.system(size: 14))
             .onAppear { loadIfNeeded() }
             .onChange(of: text) { _, newValue in
                 handleTextChange(newValue)
@@ -209,6 +205,58 @@ private struct FileMemoEditor: View {
             rotation.enterEditingMode()
         }
         store.scheduleWrite(id: id, content: newValue)
+    }
+}
+
+private struct PlainTextEditor: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return scrollView
+        }
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.font = .systemFont(ofSize: 14)
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.backgroundColor = .textBackgroundColor
+        textView.drawsBackground = true
+
+        // スマートクオート (curly quote) や ハイフン→ダッシュ などの自動置換を無効化する。
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.smartInsertDeleteEnabled = false
+
+        textView.string = text
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? NSTextView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text.wrappedValue = textView.string
+        }
     }
 }
 
