@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
     @State private var showsSettingsPanel: Bool = false
+    @State private var isPreviewing: Bool = false
 
     private static let settingsPanelWidth: CGFloat = 380
 
@@ -48,8 +49,13 @@ struct ContentView: View {
             PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
         } else if let id = rotation.currentID {
-            FileMemoEditor(id: id)
-                .id(id)
+            if isPreviewing && isMarkdownFile(id) {
+                MarkdownPreview(id: id)
+                    .id("preview:" + id)
+            } else {
+                FileMemoEditor(id: id)
+                    .id(id)
+            }
         } else {
             VStack(spacing: 8) {
                 Image(systemName: "note.text")
@@ -70,6 +76,7 @@ struct ContentView: View {
         HStack(spacing: 8) {
             pinButton
             rotationToggleButton
+            previewToggleButton
 
             Spacer()
 
@@ -141,6 +148,27 @@ struct ContentView: View {
         .help(store.rotationEnabled ? "ローテーションをオフにする" : "ローテーションをオンにする")
     }
 
+    @ViewBuilder
+    private var previewToggleButton: some View {
+        if let id = rotation.currentID, isMarkdownFile(id) {
+            Button {
+                if !isPreviewing {
+                    store.flushPending()
+                }
+                isPreviewing.toggle()
+            } label: {
+                Image(systemName: isPreviewing ? "pencil" : "eye")
+                    .foregroundColor(isPreviewing ? .accentColor : .secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(isPreviewing ? "編集モードに戻る" : "Markdown プレビュー")
+        }
+    }
+
+    private func isMarkdownFile(_ id: String) -> Bool {
+        URL(fileURLWithPath: id).pathExtension.lowercased() == "md"
+    }
+
     private var panelToggleButton: some View {
         Button {
             showsSettingsPanel.toggle()
@@ -205,6 +233,47 @@ private struct FileMemoEditor: View {
             rotation.enterEditingMode()
         }
         store.scheduleWrite(id: id, content: newValue)
+    }
+}
+
+private struct MarkdownPreview: View {
+    let id: String
+
+    @EnvironmentObject private var store: MemoStore
+    @State private var attributed: NSAttributedString = NSAttributedString()
+
+    var body: some View {
+        AttributedTextView(attributedString: attributed)
+            .background(Color(NSColor.textBackgroundColor))
+            .onAppear { attributed = MarkdownRenderer.render(store.read(id: id)) }
+    }
+}
+
+private struct AttributedTextView: NSViewRepresentable {
+    let attributedString: NSAttributedString
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        guard let textView = scrollView.documentView as? NSTextView else {
+            return scrollView
+        }
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = true
+        textView.backgroundColor = .textBackgroundColor
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.linkTextAttributes = [
+            .foregroundColor: NSColor.linkColor,
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .cursor: NSCursor.pointingHand
+        ]
+        textView.textStorage?.setAttributedString(attributedString)
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        guard let textView = nsView.documentView as? NSTextView else { return }
+        textView.textStorage?.setAttributedString(attributedString)
     }
 }
 
