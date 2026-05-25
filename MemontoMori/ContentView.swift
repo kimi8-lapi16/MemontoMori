@@ -48,8 +48,13 @@ struct ContentView: View {
             PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
         } else if let id = rotation.currentID {
-            FileMemoEditor(id: id)
-                .id(id)
+            if MemoEntry.isImage(id: id) {
+                FileImageViewer(id: id)
+                    .id(id)
+            } else {
+                FileMemoEditor(id: id)
+                    .id(id)
+            }
         } else {
             VStack(spacing: 8) {
                 Image(systemName: "note.text")
@@ -160,6 +165,53 @@ struct ContentView: View {
             prefix = rotation.mode == .rotating ? "🔄" : "✏️"
         }
         return "\(prefix) \(name)"
+    }
+}
+
+private struct FileImageViewer: View {
+    let id: String
+
+    @EnvironmentObject private var store: MemoStore
+
+    @State private var image: NSImage?
+    @State private var didLoad: Bool = false
+
+    var body: some View {
+        Group {
+            if let image {
+                // 元サイズを上限にして縮小のみ。小さい画像は等倍で中央表示。
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: image.size.width, maxHeight: image.size.height)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if didLoad {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("画像を表示できません")
+                        .foregroundColor(.secondary)
+                    Text(id)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Color.clear
+            }
+        }
+        .background(Color(NSColor.textBackgroundColor))
+        .onAppear { loadIfNeeded() }
+    }
+
+    private func loadIfNeeded() {
+        guard !didLoad else { return }
+        let url = store.directoryURL.appendingPathComponent(id)
+        image = NSImage(contentsOf: url)
+        didLoad = true
     }
 }
 
