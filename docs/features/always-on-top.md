@@ -53,4 +53,3 @@ private struct WindowAccessor: NSViewRepresentable {
 :::caution Popover との関係
 このアプリは `NSPopover`（メニューバー）と `WindowGroup` の両方の入口を持ちます。ピン留めが効くのはウィンドウとして開いた場合です。`.floating` は通常ウィンドウより前面ですが、他アプリのフルスクリーン表示などには勝てない点に注意してください。
 :::
-</content>

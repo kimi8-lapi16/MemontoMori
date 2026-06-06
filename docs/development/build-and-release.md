@@ -90,4 +90,3 @@ on:
 :::warning 署名について
 Apple Developer Program 未加入のため ad-hoc 署名（`codesign --sign -`）で配布しています。動作上の問題はありませんが、公証（notarization）はされていません。配布時はこの点を README でも明記しています。
 :::
-</content>

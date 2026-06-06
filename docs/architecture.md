@@ -82,4 +82,3 @@ sequenceDiagram
 - **テキスト編集**: `NSTextView` を `NSViewRepresentable` でラップし、スマートクオート等の自動置換を無効化（Markdown が壊れないように）。
 - **最前面表示**: `NSWindow.level` を直接操作（[Always on Top](./features/always-on-top.md)）。
 - **入力監視**: `NSEvent.addLocalMonitorForEvents` でアイドル検知（[Memo Rotation](./features/memo-rotation.md)）。
-</content>

@@ -75,4 +75,3 @@ if !currentSubdirectory.isEmpty && !availableSubdirectories.contains(currentSubd
 :::caution フォルダ名の制約
 `createSubdirectory(name:)` は `/`・`\`・`.` 始まり・`.`／`..` を拒否します。OS のパス区切りや隠しフォルダ化を避けるためのバリデーションです。
 :::
-</content>

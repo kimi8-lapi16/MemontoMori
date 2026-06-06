@@ -103,4 +103,3 @@ func advance(by step: Int = 1) {
 :::tip フォルダを切り替えると
 [サブフォルダ](./subdirectories.md)を切り替えると、そのフォルダの `lastDisplayedID` から再開します。フォルダごとに「どこまで見たか」を覚えています。
 :::
-</content>

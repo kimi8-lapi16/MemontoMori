@@ -57,5 +57,3 @@ keywords: [macOS, menu bar, SwiftUI, memo, screensaver, markdown]
 
 - アプリ全体の構造を知りたい → [アーキテクチャ](./architecture.md)
 - すぐ使いたい → [Build & Release](./development/build-and-release.md)
-</content>
-</invoke>

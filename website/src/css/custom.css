@@ -1,0 +1,32 @@
+/**
+ * MemontoMori ドキュメントのカスタムテーマ。
+ * Infima CSS 変数を上書きしている。
+ */
+
+:root {
+  --ifm-color-primary: #2e7d6b;
+  --ifm-color-primary-dark: #297062;
+  --ifm-color-primary-darker: #276a5d;
+  --ifm-color-primary-darkest: #20574c;
+  --ifm-color-primary-light: #338a74;
+  --ifm-color-primary-lighter: #36907a;
+  --ifm-color-primary-lightest: #3da387;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #5fd0b4;
+  --ifm-color-primary-dark: #45c7a6;
+  --ifm-color-primary-darker: #38c29f;
+  --ifm-color-primary-darkest: #2da086;
+  --ifm-color-primary-light: #79d9c2;
+  --ifm-color-primary-lighter: #86ddc9;
+  --ifm-color-primary-lightest: #aae8da;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.markdown table {
+  display: table;
+  width: 100%;
+}
