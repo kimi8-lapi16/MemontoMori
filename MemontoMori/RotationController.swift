@@ -71,6 +71,10 @@ final class RotationController: ObservableObject {
     }
 
     func handleUserInteraction() {
+        // 画像エントリは常にプレビュー固定。操作で編集モードに戻さず idle タイマーもリセットしない。
+        if let id = currentID, MemoEntry.isImage(id: id) {
+            return
+        }
         if mode == .rotating {
             mode = .editing
             stopRotationTimer()

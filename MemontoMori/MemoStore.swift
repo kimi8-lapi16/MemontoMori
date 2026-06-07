@@ -5,7 +5,9 @@ import Combine
 
 final class MemoStore: ObservableObject {
     static let directoryName = "MemontoMori"
-    static let supportedExtensions: Set<String> = ["txt", "md"]
+    static let textExtensions: Set<String> = ["txt", "md"]
+    static let imageExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "heic", "webp"]
+    static var supportedExtensions: Set<String> { textExtensions.union(imageExtensions) }
 
     private static let intervalKey = "memontoMori.rotationInterval"
     private static let idleKey = "memontoMori.idleTimeout"

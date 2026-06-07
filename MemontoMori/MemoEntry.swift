@@ -16,4 +16,9 @@ struct MemoEntry: Identifiable, Codable, Equatable {
     static func displayName(for id: String) -> String {
         URL(fileURLWithPath: id).deletingPathExtension().lastPathComponent
     }
+
+    static func isImage(id: String) -> Bool {
+        let ext = URL(fileURLWithPath: id).pathExtension.lowercased()
+        return MemoStore.imageExtensions.contains(ext)
+    }
 }
