@@ -1,0 +1,9 @@
+{
+  "label": "機能",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "title": "機能ガイド",
+    "description": "MemontoMori の主要機能を、PR 単位の大きめの変更ごとに解説します。"
+  }
+}

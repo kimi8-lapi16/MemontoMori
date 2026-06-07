@@ -1,0 +1,9 @@
+{
+  "label": "開発者向け",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "title": "開発者向けガイド",
+    "description": "ローカルビルド、DMG 配布、GitHub Actions によるリリースの手順。"
+  }
+}
