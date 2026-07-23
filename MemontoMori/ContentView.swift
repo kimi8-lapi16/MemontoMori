@@ -52,7 +52,7 @@ struct ContentView: View {
             if MemoEntry.isImage(id: id) {
                 FileImageViewer(id: id)
                     .id(id)
-            if isPreviewing && isMarkdownFile(id) {
+            } else if isPreviewing && isMarkdownFile(id) {
                 MarkdownPreview(id: id)
                     .id("preview:" + id)
             } else {
