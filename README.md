@@ -27,6 +27,24 @@ macOS のメニューバー常駐アプリ。
 
 必要要件: Xcode（macOS）。追加の Homebrew パッケージは不要です。
 
+### アンインストール
+
+アプリ本体（`/Applications`）と設定（環境設定・キャッシュ・保存状態）を削除します。既定では**作成したメモは削除せず残します**。再インストールすれば残したメモがそのまま読み込まれます。
+
+```sh
+# アプリと設定を削除（メモは残す。確認プロンプトあり）
+./scripts/uninstall.sh
+
+# 確認なしで実行（メモは残す）
+./scripts/uninstall.sh --yes
+
+# メモとサンドボックスコンテナごと完全削除（元に戻せないので最終確認あり）
+./scripts/uninstall.sh --purge
+
+# ローカルのビルド生成物 (./build, ./dist) も一緒に削除
+./scripts/uninstall.sh --artifacts
+```
+
 ### リリース手順
 
 1. `MemontoMori.xcodeproj/project.pbxproj` の `MARKETING_VERSION` を更新。
