@@ -45,6 +45,8 @@ macOS のメニューバー常駐アプリ。
 ./scripts/uninstall.sh --artifacts
 ```
 
+> サンドボックスコンテナ (`~/Library/Containers/...`) は macOS の保護対象のため、`rm` が「Operation not permitted」で弾かれることがあります。スクリプトは Finder 経由のゴミ箱移動に自動でフォールバックしますが、なお消せない場合は **システム設定 → プライバシーとセキュリティ → フルディスクアクセス** でお使いのターミナルを許可してから再実行してください。
+
 ### リリース手順
 
 1. `MemontoMori.xcodeproj/project.pbxproj` の `MARKETING_VERSION` を更新。
