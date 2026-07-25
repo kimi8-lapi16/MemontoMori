@@ -72,6 +72,16 @@ final class RotationController: ObservableObject {
                 self.scheduleRotationTimer()
             }
             .store(in: &cancellables)
+
+        // フォルダ移動やファイルの増減で対象が入れ替わったとき、待機タイマーが
+        // 張られていないまま編集モードで固まらないようにする。
+        store.$entries
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.ensureIdleTimerArmed()
+            }
+            .store(in: &cancellables)
     }
 
     private static func resolveInitialID(store: MemoStore) -> String? {
