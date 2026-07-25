@@ -85,7 +85,7 @@ struct ContentView: View {
 
             if !store.entries.isEmpty {
                 Button {
-                    rotation.advance(by: -1)
+                    rotation.advance(by: -1, userInitiated: true)
                 } label: {
                     Image(systemName: "chevron.left")
                 }
@@ -105,7 +105,7 @@ struct ContentView: View {
 
             if !store.entries.isEmpty {
                 Button {
-                    rotation.advance(by: 1)
+                    rotation.advance(by: 1, userInitiated: true)
                 } label: {
                     Image(systemName: "chevron.right")
                 }

@@ -136,7 +136,9 @@ final class RotationController: ObservableObject {
         scheduleIdleTimer()
     }
 
-    func advance(by step: Int = 1) {
+    /// - Parameter userInitiated: 矢印ボタンなど利用者の操作による送りかどうか。
+    ///   自動送りの直後に割り込まれないよう、次の自動送りまでの間隔を測り直す。
+    func advance(by step: Int = 1, userInitiated: Bool = false) {
         let enabled = store.enabledEntries
         guard !enabled.isEmpty else { return }
         store.flushPending()
@@ -144,6 +146,10 @@ final class RotationController: ObservableObject {
         let nextIdx = ((currentIdx + step) % enabled.count + enabled.count) % enabled.count
         currentID = enabled[nextIdx].id
         store.lastDisplayedID = currentID
+
+        if userInitiated, mode == .rotating {
+            scheduleRotationTimer()
+        }
         ensureIdleTimerArmed()
     }
 
