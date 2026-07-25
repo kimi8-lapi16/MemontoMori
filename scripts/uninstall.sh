@@ -7,6 +7,10 @@ set -euo pipefail
 # アプリ本体・設定・サンドボックスコンテナを丸ごと削除します。
 # 「メモは手元に残す。MemontoMori 関連は完全に消す」を既定の動作にしています。
 #
+# サンドボックスコンテナ (~/Library/Containers/...) は macOS の保護対象のため、
+# rm が「Operation not permitted」で弾かれることがあります。その場合は Finder 経由の
+# ゴミ箱移動へ自動でフォールバックし、なお残る場合はフルディスクアクセスの案内を出します。
+#
 # Usage:
 #   scripts/uninstall.sh              メモを Desktop へ退避してからアプリ一式を削除（確認あり）
 #   scripts/uninstall.sh --yes        確認なしで実行
@@ -33,7 +37,7 @@ while [[ $# -gt 0 ]]; do
     --yes|-y) ASSUME_YES=1; shift ;;
     --purge) PURGE=1; shift ;;
     --artifacts) CLEAN_ARTIFACTS=1; shift ;;
-    -h|--help) sed -n '3,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,21p' "$0"; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -47,6 +51,52 @@ REMOVE_PATHS=(
   "${HOME}/Library/Caches/${BUNDLE_ID}"
   "${HOME}/Library/HTTPStorages/${BUNDLE_ID}"
 )
+
+# 削除できなかったパスを記録し、最後にまとめて案内する。
+FAILED_PATHS=()
+
+# rm で消す。EPERM 等で弾かれたら Finder 経由でゴミ箱へ移動を試す。
+remove_path() {
+  local target="$1"
+  [[ -e "${target}" ]] || return 0
+
+  if rm -rf "${target}" 2>/dev/null && [[ ! -e "${target}" ]]; then
+    echo "==> 削除: ${target}"
+    return 0
+  fi
+
+  # フォールバック: Finder にゴミ箱へ移動させる（保護領域でも通ることが多い）。
+  if osascript -e "tell application \"Finder\" to delete (POSIX file \"${target}\" as alias)" >/dev/null 2>&1 \
+     && [[ ! -e "${target}" ]]; then
+    echo "==> ゴミ箱へ移動 (Finder): ${target}"
+    return 0
+  fi
+
+  echo "!!  削除できませんでした: ${target}"
+  FAILED_PATHS+=("${target}")
+  return 1
+}
+
+print_permission_help() {
+  cat <<EOF
+
+------------------------------------------------------------
+一部を削除できませんでした（macOS の保護 / 権限のためと思われます）:
+EOF
+  for p in "${FAILED_PATHS[@]}"; do echo "  - ${p}"; done
+  cat <<EOF
+
+対処のいずれかを行ってから再実行してください:
+  1) お使いのターミナルに「フルディスクアクセス」を付与する
+     システム設定 → プライバシーとセキュリティ → フルディスクアクセス
+     → ターミナル.app（または iTerm 等）を追加して ON → ターミナルを再起動
+  2) Finder で直接ゴミ箱へ:
+     Finder の「移動」→「フォルダへ移動…」で ~/Library/Containers/ を開き、
+     ${BUNDLE_ID} を選んでゴミ箱へドラッグ
+  3) スクリプトが Finder 制御の許可を求めた場合は「許可」を選ぶ
+------------------------------------------------------------
+EOF
+}
 
 echo "==> ${APP_NAME} のアンインストールを開始します"
 echo
@@ -97,20 +147,20 @@ rescued=0
 if [[ "${has_memos}" -eq 1 ]] && [[ "${PURGE}" -eq 0 ]]; then
   echo "==> メモを退避: ${MEMO_RESCUE_DIR}"
   mkdir -p "${MEMO_RESCUE_DIR}"
-  if cp -R "${MEMO_DIR}/." "${MEMO_RESCUE_DIR}/"; then
+  if cp -R "${MEMO_DIR}/." "${MEMO_RESCUE_DIR}/" 2>/dev/null; then
     rescued=1
   else
     echo "Error: メモの退避に失敗しました。安全のため削除を中止します。" >&2
     echo "       メモはそのまま残っています: ${MEMO_DIR}" >&2
+    rmdir "${MEMO_RESCUE_DIR}" 2>/dev/null || true
+    FAILED_PATHS+=("${MEMO_DIR} (読み取り)")
+    print_permission_help
     exit 1
   fi
 fi
 
 for p in "${REMOVE_PATHS[@]}"; do
-  if [[ -e "${p}" ]]; then
-    echo "==> 削除: ${p}"
-    rm -rf "${p}"
-  fi
+  remove_path "${p}" || true
 done
 
 # 設定キャッシュを確実に無効化（サンドボックスでも保険として）。
@@ -123,7 +173,16 @@ if [[ "${CLEAN_ARTIFACTS}" -eq 1 ]]; then
 fi
 
 echo
-echo "==> 完了しました。MemontoMori 関連は削除しました。"
-if [[ "${rescued}" -eq 1 ]]; then
-  echo "    メモはこちらに残してあります: ${MEMO_RESCUE_DIR}"
+if [[ "${#FAILED_PATHS[@]}" -eq 0 ]]; then
+  echo "==> 完了しました。MemontoMori 関連は削除しました。"
+  if [[ "${rescued}" -eq 1 ]]; then
+    echo "    メモはこちらに残してあります: ${MEMO_RESCUE_DIR}"
+  fi
+else
+  echo "==> 一部を削除できませんでした。"
+  if [[ "${rescued}" -eq 1 ]]; then
+    echo "    メモはこちらに退避済みです: ${MEMO_RESCUE_DIR}"
+  fi
+  print_permission_help
+  exit 1
 fi
