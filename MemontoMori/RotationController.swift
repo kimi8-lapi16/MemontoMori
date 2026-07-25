@@ -23,6 +23,7 @@ final class RotationController: ObservableObject {
         self.currentID = Self.resolveInitialID(store: store)
         installEventMonitor()
         observeRotationEnabled()
+        observeTimingSettings()
         scheduleIdleTimer()
     }
 
@@ -50,6 +51,29 @@ final class RotationController: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// 設定パネルで間隔を変えても、すでに動いているタイマーは古い秒数のままなので張り直す。
+    private func observeTimingSettings() {
+        store.$idleTimeout
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.mode == .editing else { return }
+                self.scheduleIdleTimer()
+            }
+            .store(in: &cancellables)
+
+        store.$rotationInterval
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.mode == .rotating else { return }
+                self.scheduleRotationTimer()
+            }
+            .store(in: &cancellables)
+    }
+
     private static func resolveInitialID(store: MemoStore) -> String? {
         if let last = store.lastDisplayedID,
            store.entries.contains(where: { $0.id == last }) {
@@ -72,7 +96,9 @@ final class RotationController: ObservableObject {
 
     func handleUserInteraction() {
         // 画像エントリは常にプレビュー固定。操作で編集モードに戻さず idle タイマーもリセットしない。
+        // ただしタイマーが張られていないとローテーションへ移れなくなるため、張り直しはせず確保だけする。
         if let id = currentID, MemoEntry.isImage(id: id) {
+            ensureIdleTimerArmed()
             return
         }
         if mode == .rotating {
@@ -108,6 +134,7 @@ final class RotationController: ObservableObject {
         let nextIdx = ((currentIdx + step) % enabled.count + enabled.count) % enabled.count
         currentID = enabled[nextIdx].id
         store.lastDisplayedID = currentID
+        ensureIdleTimerArmed()
     }
 
     func switchTo(id: String) {
@@ -115,6 +142,7 @@ final class RotationController: ObservableObject {
         store.flushPending()
         currentID = id
         store.lastDisplayedID = id
+        ensureIdleTimerArmed()
     }
 
     func enterEditingMode() {
@@ -122,6 +150,13 @@ final class RotationController: ObservableObject {
             mode = .editing
             stopRotationTimer()
         }
+        scheduleIdleTimer()
+    }
+
+    /// すでに待機中なら何もしない。止まったままにならないよう、必要なときだけ張り直す。
+    private func ensureIdleTimerArmed() {
+        guard mode == .editing else { return }
+        guard idleTimer == nil else { return }
         scheduleIdleTimer()
     }
 
@@ -135,7 +170,10 @@ final class RotationController: ObservableObject {
             repeats: false
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.startRotation()
+                guard let self else { return }
+                // 発火済みタイマーは再利用されないので、張られていない状態として扱えるようにする。
+                self.idleTimer = nil
+                self.startRotation()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
