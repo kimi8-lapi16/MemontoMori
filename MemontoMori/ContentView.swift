@@ -10,6 +10,10 @@ struct ContentView: View {
     @State private var showsSettingsPanel: Bool = false
     @State private var isPreviewing: Bool = false
 
+    /// 実際に画面へ出しているメモの ID。`rotation.currentID` の変更を
+    /// `withAnimation` 経由で反映するために分離している（画像切り替えアニメーション用）。
+    @State private var displayedID: String?
+
     private static let settingsPanelWidth: CGFloat = 380
 
     var body: some View {
@@ -31,6 +35,22 @@ struct ContentView: View {
         )
         .background(WindowAccessor(isPinned: $isPinned))
         .animation(.easeInOut(duration: 0.18), value: showsSettingsPanel)
+        .onChange(of: rotation.currentID) { oldValue, newValue in
+            updateDisplayedID(from: oldValue, to: newValue)
+        }
+    }
+
+    /// 画像が絡む切り替えのときだけ、設定されたアニメーションを付けて表示を更新する。
+    /// テキスト同士の切り替えは従来どおり即時。
+    private func updateDisplayedID(from oldValue: String?, to newValue: String?) {
+        let involvesImage = [oldValue, newValue]
+            .compactMap { $0 }
+            .contains { MemoEntry.isImage(id: $0) }
+        if involvesImage, let animation = store.imageTransition.animation {
+            withAnimation(animation) { displayedID = newValue }
+        } else {
+            displayedID = newValue
+        }
     }
 
     private var memoColumn: some View {
@@ -45,13 +65,26 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainArea: some View {
+        // 切り替え途中は旧ビューと新ビューが同時に存在するため、
+        // 縦に積まれてレイアウトが崩れないよう ZStack で重ねる。
+        ZStack {
+            mainAreaContent
+        }
+        // フェード中に新旧ビューが半透明になっても背後が透けないよう、下地を敷いておく。
+        .background(Color(NSColor.textBackgroundColor))
+        .clipped()
+    }
+
+    @ViewBuilder
+    private var mainAreaContent: some View {
         if store.entries.isEmpty {
             PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
-        } else if let id = rotation.currentID {
+        } else if let id = displayedID ?? rotation.currentID {
             if MemoEntry.isImage(id: id) {
                 FileImageViewer(id: id)
                     .id(id)
+                    .transition(store.imageTransition.transition)
             } else if isPreviewing && isMarkdownFile(id) {
                 MarkdownPreview(id: id)
                     .id("preview:" + id)
@@ -77,6 +110,9 @@ struct ContentView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
+            // パネル開閉でウィンドウ幅が変わっても画面上の位置がずれないよう、
+            // 左端（ウィンドウ原点側）に固定する。
+            panelToggleButton
             pinButton
             rotationToggleButton
             previewToggleButton
@@ -119,8 +155,6 @@ struct ContentView: View {
             if store.entries.isEmpty {
                 Button("Clear") { freeMemoText = "" }
             }
-
-            panelToggleButton
         }
         .padding(.horizontal, 10)
         .frame(height: 32)

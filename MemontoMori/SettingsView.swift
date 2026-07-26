@@ -83,6 +83,11 @@ struct SettingsView: View {
                         Text(option.label).tag(option.value)
                     }
                 }
+                Picker("画像切り替え", selection: $store.imageTransition) {
+                    ForEach(ImageTransitionStyle.allCases) { style in
+                        Text(style.label).tag(style)
+                    }
+                }
             }
         }
         .padding()
