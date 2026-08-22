@@ -24,7 +24,7 @@ graph TD
     CV --> Preview["MarkdownPreview<br/>(AttributedTextView)"]
     CV --> Settings["SettingsView<br/>(embedded panel)"]
 
-    Sidebar --> Tree["FolderNode / FolderRow<br/>(階層の組み立て)"]
+    Sidebar --> Tree["FolderNode / SidebarRow<br/>(階層の組み立て)"]
 
     Preview --> MR["MarkdownRenderer"]
     Store --> FS[("~/Documents/MemontoMori/<br/>*.md / *.txt")]
@@ -40,9 +40,9 @@ graph TD
 | `MemoStore` | `ObservableObject` | ファイルの読み書き、再スキャン、サブフォルダ管理、設定値の永続化。 |
 | `RotationController` | `ObservableObject` | アイドル検知、自動ローテーション、表示中メモの管理。 |
 | `ContentView` | `View` | メイン UI。エディタ／プレビュー／設定パネルの切り替えとフッター操作。 |
-| `SettingsView` | `View` | ファイル一覧・フォルダ選択・動作設定。埋め込み／独立の両対応。 |
-| `FolderSidebar` | `View` | 左ペインのフォルダツリー。クリックでフォルダを即切り替え。 |
-| `FolderNode` / `FolderRow` | `struct` | 相対パスの配列からフォルダ階層を組み立て、描画する行に平坦化。 |
+| `SettingsView` | `View` | ローテーション順の並べ替えと動作設定。埋め込み／独立の両対応。 |
+| `FolderSidebar` | `View` | 左ペインのフォルダツリー。フォルダ／メモの切り替えと作成・削除・Finder 表示。 |
+| `FolderNode` / `SidebarRow` | `struct` | 相対パスの配列からフォルダ階層を組み立て、描画する行に平坦化。 |
 | `MarkdownRenderer` | `enum` + パーサ | Markdown → `NSAttributedString` の自前変換。 |
 | `MenuBarController` | `class` | `NSStatusItem` と `NSPopover` の管理（メニューバー常駐）。 |
 | `MemoEntry` | `struct` | 1メモのメタ情報（`id` = ファイル名, `isEnabled`）。 |

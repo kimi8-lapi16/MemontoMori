@@ -49,32 +49,81 @@ struct FolderNode: Identifiable, Equatable {
     }
 
     /// 展開状態にしたがって、実際に描画する行だけを上から順に並べる。
-    func visibleRows(isExpanded: (String) -> Bool) -> [FolderRow] {
-        var rows: [FolderRow] = []
-        appendRows(to: &rows, depth: 0, isExpanded: isExpanded)
+    ///
+    /// - Parameters:
+    ///   - isExpanded: そのフォルダが開かれているか。
+    ///   - memoCount: フォルダが持つメモの数（開かなくても件数を出すため）。
+    ///   - memos: そのフォルダの直下に並べるメモ。ローテーション対象フォルダ以外は空を返す。
+    func rows(
+        isExpanded: (String) -> Bool,
+        memoCount: (String) -> Int,
+        memos: (String) -> [MemoEntry]
+    ) -> [SidebarRow] {
+        var rows: [SidebarRow] = []
+        appendRows(to: &rows, depth: 0, isExpanded: isExpanded, memoCount: memoCount, memos: memos)
         return rows
     }
 
     private func appendRows(
-        to rows: inout [FolderRow],
+        to rows: inout [SidebarRow],
         depth: Int,
-        isExpanded: (String) -> Bool
+        isExpanded: (String) -> Bool,
+        memoCount: (String) -> Int,
+        memos: (String) -> [MemoEntry]
     ) {
+        let ownMemos = memos(id)
         rows.append(
-            FolderRow(id: id, name: name, depth: depth, hasChildren: hasChildren, isRoot: isRoot)
+            SidebarRow(
+                id: "dir:" + id,
+                folderPath: id,
+                name: name,
+                depth: depth,
+                kind: .folder(
+                    hasChildren: hasChildren || !ownMemos.isEmpty,
+                    isRoot: isRoot,
+                    memoCount: memoCount(id)
+                )
+            )
         )
         guard isExpanded(id) else { return }
+
+        // IDE と同じくフォルダを先、ファイルを後に並べる。
         for child in children {
-            child.appendRows(to: &rows, depth: depth + 1, isExpanded: isExpanded)
+            child.appendRows(
+                to: &rows,
+                depth: depth + 1,
+                isExpanded: isExpanded,
+                memoCount: memoCount,
+                memos: memos
+            )
+        }
+        for memo in ownMemos {
+            rows.append(
+                SidebarRow(
+                    id: "memo:" + (id.isEmpty ? memo.id : id + "/" + memo.id),
+                    folderPath: id,
+                    name: memo.id,
+                    depth: depth + 1,
+                    kind: .memo(isEnabled: memo.isEnabled)
+                )
+            )
         }
     }
 }
 
 /// 左ペインに描画する 1 行分の情報。
-struct FolderRow: Identifiable, Equatable {
+struct SidebarRow: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case folder(hasChildren: Bool, isRoot: Bool, memoCount: Int)
+        case memo(isEnabled: Bool)
+    }
+
+    /// 行の一意な ID。フォルダ行とメモ行で名前が衝突しないよう接頭辞を付ける。
     let id: String
+    /// フォルダ行は自身の相対パス、メモ行は置かれているフォルダの相対パス。
+    let folderPath: String
+    /// フォルダ行はフォルダ名、メモ行はファイル名（拡張子込み）。
     let name: String
     let depth: Int
-    let hasChildren: Bool
-    let isRoot: Bool
+    let kind: Kind
 }

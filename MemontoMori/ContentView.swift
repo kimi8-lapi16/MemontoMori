@@ -150,7 +150,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text("有効なメモがありません")
                     .foregroundColor(.secondary)
-                Text("右のパネルから表示するメモを選択してください")
+                Text("左のフォルダツリーからメモを選択してください")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

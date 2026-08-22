@@ -33,6 +33,10 @@ final class MemoStore: ObservableObject {
     @Published private(set) var entries: [MemoEntry] = []
     @Published private(set) var availableSubdirectories: [String] = []
 
+    /// フォルダごとのメモ数。キーはルートからの相対パス（ルートは空文字）。
+    /// 左ペインで「開かなくても中身があるか」を示すために保持する。
+    @Published private(set) var memoCounts: [String: Int] = [:]
+
     @Published var rotationInterval: TimeInterval {
         didSet { UserDefaults.standard.set(rotationInterval, forKey: Self.intervalKey) }
     }
@@ -107,13 +111,14 @@ final class MemoStore: ObservableObject {
 
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let dirs = Self.scanSubdirectories(root: root)
+        let scan = Self.scanFolders(root: root)
         var storedSubdir = defaults.string(forKey: Self.subdirKey) ?? ""
-        if !storedSubdir.isEmpty && !dirs.contains(storedSubdir) {
+        if !storedSubdir.isEmpty && !scan.paths.contains(storedSubdir) {
             storedSubdir = ""
         }
 
-        self.availableSubdirectories = dirs
+        self.availableSubdirectories = scan.paths
+        self.memoCounts = scan.counts
         self.currentSubdirectory = storedSubdir
         self.lastDisplayedID = defaults.string(forKey: Self.lastIDKey(for: storedSubdir))
 
@@ -261,9 +266,16 @@ final class MemoStore: ObservableObject {
     }
 
     func revealInFinder(relativePath: String) {
-        let url = url(forRelativePath: relativePath)
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        NSWorkspace.shared.open(url)
+        let target = url(forRelativePath: relativePath)
+        guard FileManager.default.fileExists(atPath: target.path) else { return }
+        NSWorkspace.shared.open(target)
+    }
+
+    /// メモ本体を Finder で選択状態にして表示する。
+    func revealInFinder(memoID: String) {
+        let target = directoryURL.appendingPathComponent(memoID)
+        guard FileManager.default.fileExists(atPath: target.path) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([target])
     }
 
     func url(forRelativePath relativePath: String) -> URL {
@@ -319,7 +331,9 @@ final class MemoStore: ObservableObject {
     }
 
     func refreshAvailableSubdirectories() {
-        availableSubdirectories = Self.scanSubdirectories(root: rootDirectoryURL)
+        let scan = Self.scanFolders(root: rootDirectoryURL)
+        availableSubdirectories = scan.paths
+        memoCounts = scan.counts
 
         // 消えたフォルダの展開状態を残さない
         let valid = Set(availableSubdirectories)
@@ -340,6 +354,10 @@ final class MemoStore: ObservableObject {
 
     static func clampSidebarWidth(_ width: Double) -> Double {
         min(max(width, minSidebarWidth), maxSidebarWidth)
+    }
+
+    func memoCount(in relativePath: String) -> Int {
+        memoCounts[relativePath] ?? 0
     }
 
     func isExpanded(_ relativePath: String) -> Bool {
@@ -370,29 +388,35 @@ final class MemoStore: ObservableObject {
         }
     }
 
-    private static func scanSubdirectories(root: URL) -> [String] {
+    /// ルート配下を 1 度だけ走査して、フォルダの相対パスとフォルダごとのメモ数を同時に集める。
+    private static func scanFolders(root: URL) -> (paths: [String], counts: [String: Int]) {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return []
+            return ([], [:])
         }
         let rootPath = root.standardizedFileURL.path
-        var result: [String] = []
+        var paths: [String] = []
+        var counts: [String: Int] = [:]
         for case let url as URL in enumerator {
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            guard isDir else { continue }
             let path = url.standardizedFileURL.path
             guard path.hasPrefix(rootPath) else { continue }
             var rel = String(path.dropFirst(rootPath.count))
             if rel.hasPrefix("/") { rel.removeFirst() }
-            if !rel.isEmpty {
-                result.append(rel)
+            guard !rel.isEmpty else { continue }
+
+            if isDir {
+                paths.append(rel)
+            } else if supportedExtensions.contains(url.pathExtension.lowercased()) {
+                let parent = rel.split(separator: "/").dropLast().joined(separator: "/")
+                counts[parent, default: 0] += 1
             }
         }
-        result.sort()
-        return result
+        paths.sort()
+        return (paths, counts)
     }
 
     private func loadStoredEntries() -> [MemoEntry] {
