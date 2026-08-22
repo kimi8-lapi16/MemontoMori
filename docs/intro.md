@@ -32,8 +32,9 @@ keywords: [macOS, menu bar, SwiftUI, memo, screensaver, markdown]
 | 常に最前面（ピン留め） | ウィンドウを floating レベルに固定 | [Always on Top](./features/always-on-top.md) |
 | メモのローテーション表示 | アイドル検知 → 自動巡回 | [Memo Rotation](./features/memo-rotation.md) |
 | サブフォルダ切り替え | ローテーション対象ディレクトリを選択 | [Subdirectories](./features/subdirectories.md) |
+| フォルダツリー（左ペイン） | 階層とメモの一覧・切り替え・作成・削除 | [Folder Sidebar](./features/folder-sidebar.md) |
 | Markdown プレビュー | 自前パーサで `NSAttributedString` 描画 | [Markdown Preview](./features/markdown-preview.md) |
-| 分割パネル設定 | メモ編集＋設定を横並び表示 | [Split-Panel Settings](./features/split-panel-settings.md) |
+| 設定ページ | 本文エリアを差し替えて全体設定を表示 | [Settings Page](./features/settings-page.md) |
 | DMG 配布 / リリース | ローカルビルド & GitHub Actions | [Build & Release](./development/build-and-release.md) |
 
 ## データの置き場所

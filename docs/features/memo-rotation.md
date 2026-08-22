@@ -48,7 +48,7 @@ stateDiagram-v2
 
 ## 設定値
 
-設定パネルから変更でき、`UserDefaults` に保存されます。
+[設定ページ](./settings-page.md)から変更でき、`UserDefaults` に保存されます。
 
 | 設定 | 既定値 | 選択肢 | 役割 |
 | --- | --- | --- | --- |

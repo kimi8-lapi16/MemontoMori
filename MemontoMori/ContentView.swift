@@ -7,37 +7,84 @@ struct ContentView: View {
 
     @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
-    @State private var showsSettingsPanel: Bool = false
     @State private var isPreviewing: Bool = false
 
     /// 実際に画面へ出しているメモの ID。`rotation.currentID` の変更を
     /// `withAnimation` 経由で反映するために分離している（画像切り替えアニメーション用）。
     @State private var displayedID: String?
 
-    private static let settingsPanelWidth: CGFloat = 380
+    /// 左ペインの幅をドラッグしている間の開始幅。
+    @State private var sidebarDragStartWidth: Double?
+
+    private static let memoMinWidth: CGFloat = 320
+    private static let resizeHandleWidth: CGFloat = 1
 
     var body: some View {
-        HStack(spacing: 0) {
-            memoColumn
-                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
+        // フッターは横並び全体の下に敷く。左ペインを開いてもトグル類の位置が
+        // ウィンドウ左下から動かないようにするため。
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                if store.folderSidebarVisible {
+                    FolderSidebar(store: store, rotation: rotation)
+                        .frame(width: CGFloat(store.folderSidebarWidth))
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    sidebarResizeHandle
+                }
 
-            if showsSettingsPanel {
-                Divider()
-                SettingsView(store: store, rotation: rotation, embedded: true)
-                    .frame(width: Self.settingsPanelWidth)
-                    .background(Color(NSColor.windowBackgroundColor))
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                mainArea
+                    .frame(minWidth: Self.memoMinWidth, maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            footer
+                .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(
-            minWidth: showsSettingsPanel ? 320 + Self.settingsPanelWidth : 320,
-            minHeight: 260
-        )
+        .frame(minWidth: minWindowWidth, minHeight: 260)
         .background(WindowAccessor(isPinned: $isPinned))
-        .animation(.easeInOut(duration: 0.18), value: showsSettingsPanel)
+        .animation(.easeInOut(duration: 0.18), value: store.folderSidebarVisible)
         .onChange(of: rotation.currentID) { oldValue, newValue in
             updateDisplayedID(from: oldValue, to: newValue)
         }
+    }
+
+    private var minWindowWidth: CGFloat {
+        var width = Self.memoMinWidth
+        if store.folderSidebarVisible {
+            width += CGFloat(store.folderSidebarWidth) + Self.resizeHandleWidth
+        }
+        return width
+    }
+
+    /// 左ペインと本文の境目。ドラッグで幅を変えられる。
+    private var sidebarResizeHandle: some View {
+        Divider()
+            .frame(width: Self.resizeHandleWidth)
+            .overlay(
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 7)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside {
+                            NSCursor.resizeLeftRight.push()
+                        } else {
+                            NSCursor.pop()
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { value in
+                                let base = sidebarDragStartWidth ?? store.folderSidebarWidth
+                                if sidebarDragStartWidth == nil {
+                                    sidebarDragStartWidth = base
+                                }
+                                store.setFolderSidebarWidth(base + Double(value.translation.width))
+                            }
+                            .onEnded { _ in sidebarDragStartWidth = nil }
+                    )
+            )
     }
 
     /// 画像が絡む切り替えのときだけ、設定されたアニメーションを付けて表示を更新する。
@@ -50,16 +97,6 @@ struct ContentView: View {
             withAnimation(animation) { displayedID = newValue }
         } else {
             displayedID = newValue
-        }
-    }
-
-    private var memoColumn: some View {
-        VStack(spacing: 0) {
-            mainArea
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            footer
-                .background(Color(NSColor.windowBackgroundColor))
         }
     }
 
@@ -77,7 +114,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainAreaContent: some View {
-        if store.entries.isEmpty {
+        if store.isShowingSettings {
+            SettingsPage(store: store)
+        } else if store.entries.isEmpty {
             PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
         } else if let id = displayedID ?? rotation.currentID {
@@ -99,7 +138,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
                 Text("有効なメモがありません")
                     .foregroundColor(.secondary)
-                Text("右のパネルから表示するメモを選択してください")
+                Text("左のフォルダツリーからメモを選択してください")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -112,7 +151,8 @@ struct ContentView: View {
         HStack(spacing: 8) {
             // パネル開閉でウィンドウ幅が変わっても画面上の位置がずれないよう、
             // 左端（ウィンドウ原点側）に固定する。
-            panelToggleButton
+            sidebarToggleButton
+            settingsToggleButton
             pinButton
             rotationToggleButton
             previewToggleButton
@@ -187,7 +227,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var previewToggleButton: some View {
-        if let id = rotation.currentID, isMarkdownFile(id) {
+        if !store.isShowingSettings, let id = rotation.currentID, isMarkdownFile(id) {
             Button {
                 if !isPreviewing {
                     store.flushPending()
@@ -206,14 +246,30 @@ struct ContentView: View {
         URL(fileURLWithPath: id).pathExtension.lowercased() == "md"
     }
 
-    private var panelToggleButton: some View {
+    private var sidebarToggleButton: some View {
         Button {
-            showsSettingsPanel.toggle()
+            store.folderSidebarVisible.toggle()
         } label: {
-            Image(systemName: showsSettingsPanel ? "sidebar.right" : "sidebar.squares.right")
+            Image(systemName: "sidebar.left")
+                .foregroundColor(store.folderSidebarVisible ? .accentColor : .secondary)
         }
         .buttonStyle(.borderless)
-        .help(showsSettingsPanel ? "設定パネルを閉じる" : "設定パネルを開く")
+        .help(store.folderSidebarVisible ? "フォルダツリーを閉じる" : "フォルダツリーを開く")
+    }
+
+    /// VS Code と同じく、設定は本文エリアを丸ごと差し替える「ページ」として開く。
+    private var settingsToggleButton: some View {
+        Button {
+            if !store.isShowingSettings {
+                store.flushPending()
+            }
+            store.isShowingSettings.toggle()
+        } label: {
+            Image(systemName: store.isShowingSettings ? "gearshape.fill" : "gearshape")
+                .foregroundColor(store.isShowingSettings ? .accentColor : .secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(store.isShowingSettings ? "設定を閉じる" : "設定を開く")
     }
 
     private func footerLabel(for id: String) -> String {
