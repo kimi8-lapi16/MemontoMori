@@ -14,6 +14,13 @@ final class MemoStore: ObservableObject {
     private static let subdirKey = "memontoMori.currentSubdirectory"
     private static let rotationEnabledKey = "memontoMori.rotationEnabled"
     private static let imageTransitionKey = "memontoMori.imageTransition"
+    private static let sidebarVisibleKey = "memontoMori.folderSidebarVisible"
+    private static let sidebarWidthKey = "memontoMori.folderSidebarWidth"
+    private static let expandedFoldersKey = "memontoMori.expandedFolders"
+
+    static let defaultSidebarWidth: Double = 200
+    static let minSidebarWidth: Double = 140
+    static let maxSidebarWidth: Double = 400
 
     private static func entriesKey(for subdir: String) -> String {
         subdir.isEmpty ? "memontoMori.entries" : "memontoMori.entries.\(subdir)"
@@ -52,6 +59,23 @@ final class MemoStore: ObservableObject {
         didSet { UserDefaults.standard.set(currentSubdirectory, forKey: Self.subdirKey) }
     }
 
+    /// 左ペイン（フォルダツリー）を表示するか。
+    @Published var folderSidebarVisible: Bool {
+        didSet { UserDefaults.standard.set(folderSidebarVisible, forKey: Self.sidebarVisibleKey) }
+    }
+
+    /// 左ペインの幅。ドラッグで変えられるので永続化する。
+    @Published private(set) var folderSidebarWidth: Double {
+        didSet { UserDefaults.standard.set(folderSidebarWidth, forKey: Self.sidebarWidthKey) }
+    }
+
+    /// 左ペインで開いた状態にしているフォルダの相対パス。
+    @Published private(set) var expandedFolders: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(expandedFolders), forKey: Self.expandedFoldersKey)
+        }
+    }
+
     let rootDirectoryURL: URL
 
     var directoryURL: URL {
@@ -75,6 +99,11 @@ final class MemoStore: ObservableObject {
         self.rotationEnabled = (defaults.object(forKey: Self.rotationEnabledKey) as? Bool) ?? true
         self.imageTransition = defaults.string(forKey: Self.imageTransitionKey)
             .flatMap(ImageTransitionStyle.init(rawValue:)) ?? .fade
+        self.folderSidebarVisible = (defaults.object(forKey: Self.sidebarVisibleKey) as? Bool) ?? true
+        self.folderSidebarWidth = Self.clampSidebarWidth(
+            (defaults.object(forKey: Self.sidebarWidthKey) as? Double) ?? Self.defaultSidebarWidth
+        )
+        self.expandedFolders = Set(defaults.stringArray(forKey: Self.expandedFoldersKey) ?? [])
 
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
@@ -88,6 +117,7 @@ final class MemoStore: ObservableObject {
         self.currentSubdirectory = storedSubdir
         self.lastDisplayedID = defaults.string(forKey: Self.lastIDKey(for: storedSubdir))
 
+        expandAncestors(of: storedSubdir)
         ensureDirectoryExists()
         rescan()
     }
@@ -230,6 +260,18 @@ final class MemoStore: ObservableObject {
         NSWorkspace.shared.open(directoryURL)
     }
 
+    func revealInFinder(relativePath: String) {
+        let url = url(forRelativePath: relativePath)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    func url(forRelativePath relativePath: String) -> URL {
+        relativePath.isEmpty
+            ? rootDirectoryURL
+            : rootDirectoryURL.appendingPathComponent(relativePath, isDirectory: true)
+    }
+
     var enabledEntries: [MemoEntry] {
         entries.filter { $0.isEnabled }
     }
@@ -243,6 +285,7 @@ final class MemoStore: ObservableObject {
 
         flushPending()
         currentSubdirectory = target
+        expandAncestors(of: target)
         ensureDirectoryExists()
         lastDisplayedID = UserDefaults.standard.string(forKey: Self.lastIDKey(for: target))
         rescan()
@@ -277,6 +320,54 @@ final class MemoStore: ObservableObject {
 
     func refreshAvailableSubdirectories() {
         availableSubdirectories = Self.scanSubdirectories(root: rootDirectoryURL)
+
+        // 消えたフォルダの展開状態を残さない
+        let valid = Set(availableSubdirectories)
+        let pruned = expandedFolders.intersection(valid)
+        if pruned != expandedFolders {
+            expandedFolders = pruned
+        }
+    }
+
+    // MARK: - Folder sidebar
+
+    func setFolderSidebarWidth(_ width: Double) {
+        let clamped = Self.clampSidebarWidth(width)
+        if clamped != folderSidebarWidth {
+            folderSidebarWidth = clamped
+        }
+    }
+
+    static func clampSidebarWidth(_ width: Double) -> Double {
+        min(max(width, minSidebarWidth), maxSidebarWidth)
+    }
+
+    func isExpanded(_ relativePath: String) -> Bool {
+        // ルートは常に開いた状態として扱う
+        relativePath.isEmpty || expandedFolders.contains(relativePath)
+    }
+
+    func toggleExpansion(_ relativePath: String) {
+        guard !relativePath.isEmpty else { return }
+        if expandedFolders.contains(relativePath) {
+            expandedFolders.remove(relativePath)
+        } else {
+            expandedFolders.insert(relativePath)
+        }
+    }
+
+    /// 選択中フォルダが折りたたまれた枝の中に隠れないよう、祖先をまとめて開く。
+    func expandAncestors(of relativePath: String) {
+        guard !relativePath.isEmpty else { return }
+        var accumulated: [String] = []
+        var opened = expandedFolders
+        for component in relativePath.split(separator: "/") {
+            accumulated.append(String(component))
+            opened.insert(accumulated.joined(separator: "/"))
+        }
+        if opened != expandedFolders {
+            expandedFolders = opened
+        }
     }
 
     private static func scanSubdirectories(root: URL) -> [String] {

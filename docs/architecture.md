@@ -19,9 +19,12 @@ graph TD
     Rotation --> Store
     App --> CV["ContentView"]
 
+    CV --> Sidebar["FolderSidebar<br/>(左ペイン / フォルダツリー)"]
     CV --> Editor["FileMemoEditor<br/>(PlainTextEditor / NSTextView)"]
     CV --> Preview["MarkdownPreview<br/>(AttributedTextView)"]
     CV --> Settings["SettingsView<br/>(embedded panel)"]
+
+    Sidebar --> Tree["FolderNode / FolderRow<br/>(階層の組み立て)"]
 
     Preview --> MR["MarkdownRenderer"]
     Store --> FS[("~/Documents/MemontoMori/<br/>*.md / *.txt")]
@@ -38,6 +41,8 @@ graph TD
 | `RotationController` | `ObservableObject` | アイドル検知、自動ローテーション、表示中メモの管理。 |
 | `ContentView` | `View` | メイン UI。エディタ／プレビュー／設定パネルの切り替えとフッター操作。 |
 | `SettingsView` | `View` | ファイル一覧・フォルダ選択・動作設定。埋め込み／独立の両対応。 |
+| `FolderSidebar` | `View` | 左ペインのフォルダツリー。クリックでフォルダを即切り替え。 |
+| `FolderNode` / `FolderRow` | `struct` | 相対パスの配列からフォルダ階層を組み立て、描画する行に平坦化。 |
 | `MarkdownRenderer` | `enum` + パーサ | Markdown → `NSAttributedString` の自前変換。 |
 | `MenuBarController` | `class` | `NSStatusItem` と `NSPopover` の管理（メニューバー常駐）。 |
 | `MemoEntry` | `struct` | 1メモのメタ情報（`id` = ファイル名, `isEnabled`）。 |
