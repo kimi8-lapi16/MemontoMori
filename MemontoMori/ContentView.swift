@@ -7,7 +7,6 @@ struct ContentView: View {
 
     @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
-    @State private var showsSettingsPanel: Bool = false
     @State private var isPreviewing: Bool = false
 
     /// 実際に画面へ出しているメモの ID。`rotation.currentID` の変更を
@@ -17,7 +16,6 @@ struct ContentView: View {
     /// 左ペインの幅をドラッグしている間の開始幅。
     @State private var sidebarDragStartWidth: Double?
 
-    private static let settingsPanelWidth: CGFloat = 380
     private static let memoMinWidth: CGFloat = 320
     private static let resizeHandleWidth: CGFloat = 1
 
@@ -35,14 +33,6 @@ struct ContentView: View {
 
                 mainArea
                     .frame(minWidth: Self.memoMinWidth, maxWidth: .infinity, maxHeight: .infinity)
-
-                if showsSettingsPanel {
-                    Divider()
-                    SettingsView(store: store, rotation: rotation, embedded: true)
-                        .frame(width: Self.settingsPanelWidth)
-                        .background(Color(NSColor.windowBackgroundColor))
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -53,7 +43,6 @@ struct ContentView: View {
         }
         .frame(minWidth: minWindowWidth, minHeight: 260)
         .background(WindowAccessor(isPinned: $isPinned))
-        .animation(.easeInOut(duration: 0.18), value: showsSettingsPanel)
         .animation(.easeInOut(duration: 0.18), value: store.folderSidebarVisible)
         .onChange(of: rotation.currentID) { oldValue, newValue in
             updateDisplayedID(from: oldValue, to: newValue)
@@ -64,9 +53,6 @@ struct ContentView: View {
         var width = Self.memoMinWidth
         if store.folderSidebarVisible {
             width += CGFloat(store.folderSidebarWidth) + Self.resizeHandleWidth
-        }
-        if showsSettingsPanel {
-            width += Self.settingsPanelWidth
         }
         return width
     }
@@ -128,7 +114,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private var mainAreaContent: some View {
-        if store.entries.isEmpty {
+        if store.isShowingSettings {
+            SettingsPage(store: store)
+        } else if store.entries.isEmpty {
             PlainTextEditor(text: $freeMemoText)
                 .background(Color(NSColor.textBackgroundColor))
         } else if let id = displayedID ?? rotation.currentID {
@@ -164,7 +152,7 @@ struct ContentView: View {
             // パネル開閉でウィンドウ幅が変わっても画面上の位置がずれないよう、
             // 左端（ウィンドウ原点側）に固定する。
             sidebarToggleButton
-            panelToggleButton
+            settingsToggleButton
             pinButton
             rotationToggleButton
             previewToggleButton
@@ -239,7 +227,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var previewToggleButton: some View {
-        if let id = rotation.currentID, isMarkdownFile(id) {
+        if !store.isShowingSettings, let id = rotation.currentID, isMarkdownFile(id) {
             Button {
                 if !isPreviewing {
                     store.flushPending()
@@ -269,14 +257,19 @@ struct ContentView: View {
         .help(store.folderSidebarVisible ? "フォルダツリーを閉じる" : "フォルダツリーを開く")
     }
 
-    private var panelToggleButton: some View {
+    /// VS Code と同じく、設定は本文エリアを丸ごと差し替える「ページ」として開く。
+    private var settingsToggleButton: some View {
         Button {
-            showsSettingsPanel.toggle()
+            if !store.isShowingSettings {
+                store.flushPending()
+            }
+            store.isShowingSettings.toggle()
         } label: {
-            Image(systemName: showsSettingsPanel ? "sidebar.right" : "sidebar.squares.right")
+            Image(systemName: store.isShowingSettings ? "gearshape.fill" : "gearshape")
+                .foregroundColor(store.isShowingSettings ? .accentColor : .secondary)
         }
         .buttonStyle(.borderless)
-        .help(showsSettingsPanel ? "設定パネルを閉じる" : "設定パネルを開く")
+        .help(store.isShowingSettings ? "設定を閉じる" : "設定を開く")
     }
 
     private func footerLabel(for id: String) -> String {

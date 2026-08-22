@@ -22,7 +22,7 @@ graph TD
     CV --> Sidebar["FolderSidebar<br/>(左ペイン / フォルダツリー)"]
     CV --> Editor["FileMemoEditor<br/>(PlainTextEditor / NSTextView)"]
     CV --> Preview["MarkdownPreview<br/>(AttributedTextView)"]
-    CV --> Settings["SettingsView<br/>(embedded panel)"]
+    CV --> Settings["SettingsPage<br/>(本文エリアを差し替え)"]
 
     Sidebar --> Tree["FolderNode / SidebarRow<br/>(階層の組み立て)"]
 
@@ -37,11 +37,11 @@ graph TD
 | 型 | 種別 | 役割 |
 | --- | --- | --- |
 | `MemontoMoriApp` | `App` | エントリポイント。`MemoStore` と `RotationController` を生成し環境に注入。 |
-| `MemoStore` | `ObservableObject` | ファイルの読み書き、再スキャン、サブフォルダ管理、設定値の永続化。 |
+| `MemoStore` | `ObservableObject` | ファイルの読み書き、再スキャン、フォルダ別のメモ一覧管理、設定値の永続化。 |
 | `RotationController` | `ObservableObject` | アイドル検知、自動ローテーション、表示中メモの管理。 |
-| `ContentView` | `View` | メイン UI。エディタ／プレビュー／設定パネルの切り替えとフッター操作。 |
-| `SettingsView` | `View` | ローテーション順の並べ替えと動作設定。埋め込み／独立の両対応。 |
-| `FolderSidebar` | `View` | 左ペインのフォルダツリー。フォルダ／メモの切り替えと作成・削除・Finder 表示。 |
+| `ContentView` | `View` | メイン UI。エディタ／プレビュー／設定ページの切り替えとフッター操作。 |
+| `SettingsPage` | `View` | 本文エリアを差し替えて表示する全体設定ページ。 |
+| `FolderSidebar` | `View` | 左ペイン。フォルダ／メモの切り替え、作成・並べ替え・削除・Finder 表示。 |
 | `FolderNode` / `SidebarRow` | `struct` | 相対パスの配列からフォルダ階層を組み立て、描画する行に平坦化。 |
 | `MarkdownRenderer` | `enum` + パーサ | Markdown → `NSAttributedString` の自前変換。 |
 | `MenuBarController` | `class` | `NSStatusItem` と `NSPopover` の管理（メニューバー常駐）。 |

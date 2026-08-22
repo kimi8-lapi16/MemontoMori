@@ -33,9 +33,10 @@ final class MemoStore: ObservableObject {
     @Published private(set) var entries: [MemoEntry] = []
     @Published private(set) var availableSubdirectories: [String] = []
 
-    /// フォルダごとのメモ数。キーはルートからの相対パス（ルートは空文字）。
-    /// 左ペインで「開かなくても中身があるか」を示すために保持する。
-    @Published private(set) var memoCounts: [String: Int] = [:]
+    /// フォルダごとのメモ一覧。キーはルートからの相対パス（ルートは空文字）。
+    /// 左ペインではどのフォルダも開閉して中身を見られるので、選択中フォルダ以外のぶんも持つ。
+    /// 並び順・有効状態はフォルダごとに `UserDefaults` へ保存したものを反映している。
+    @Published private(set) var folderEntries: [String: [MemoEntry]] = [:]
 
     @Published var rotationInterval: TimeInterval {
         didSet { UserDefaults.standard.set(rotationInterval, forKey: Self.intervalKey) }
@@ -63,6 +64,10 @@ final class MemoStore: ObservableObject {
         didSet { UserDefaults.standard.set(currentSubdirectory, forKey: Self.subdirKey) }
     }
 
+    /// 本文エリアを設定ページに切り替えているか。
+    /// VS Code の設定タブと同じく開きっぱなしにするものではないので永続化しない。
+    @Published var isShowingSettings: Bool = false
+
     /// 左ペイン（フォルダツリー）を表示するか。
     @Published var folderSidebarVisible: Bool {
         didSet { UserDefaults.standard.set(folderSidebarVisible, forKey: Self.sidebarVisibleKey) }
@@ -87,6 +92,9 @@ final class MemoStore: ObservableObject {
             ? rootDirectoryURL
             : rootDirectoryURL.appendingPathComponent(currentSubdirectory, isDirectory: true)
     }
+
+    /// 走査で見つかったフォルダごとのファイル名。`folderEntries` を組み立てる材料。
+    private var folderMemoNames: [String: [String]] = [:]
 
     private var pendingWrites: [String: String] = [:]
     private var debounceTask: Task<Void, Never>?
@@ -118,7 +126,7 @@ final class MemoStore: ObservableObject {
         }
 
         self.availableSubdirectories = scan.paths
-        self.memoCounts = scan.counts
+        self.folderMemoNames = scan.memoNames
         self.currentSubdirectory = storedSubdir
         self.lastDisplayedID = defaults.string(forKey: Self.lastIDKey(for: storedSubdir))
 
@@ -143,48 +151,82 @@ final class MemoStore: ObservableObject {
 
         ensureDirectoryExists()
 
-        let stored = loadStoredEntries()
-
-        let urls: [URL]
-        do {
-            urls = try FileManager.default.contentsOfDirectory(
-                at: directoryURL,
-                includingPropertiesForKeys: nil,
-                options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        var rebuilt: [String: [MemoEntry]] = [:]
+        for (folder, names) in folderMemoNames {
+            rebuilt[folder] = Self.merge(
+                stored: loadStoredEntries(for: folder),
+                presentNames: Set(names)
             )
-        } catch {
-            entries = []
-            return
+        }
+        // メモが 0 件のフォルダもキーは作っておく（現在フォルダの参照を空振りさせない）
+        if rebuilt[currentSubdirectory] == nil {
+            rebuilt[currentSubdirectory] = []
         }
 
-        let presentNames: Set<String> = Set(urls.compactMap { url in
-            Self.supportedExtensions.contains(url.pathExtension.lowercased())
-                ? url.lastPathComponent
-                : nil
-        })
+        folderEntries = rebuilt
+        entries = rebuilt[currentSubdirectory] ?? []
+        saveEntries(entries, for: currentSubdirectory)
+    }
 
-        var ordered: [MemoEntry] = stored.compactMap { entry in
-            presentNames.contains(entry.id) ? entry : nil
-        }
+    /// 保存済みの並び順・有効状態と、実在するファイルを突き合わせる。
+    /// 消えたファイルは落とし、新しいファイルは名前順で末尾に足す。
+    private static func merge(stored: [MemoEntry], presentNames: Set<String>) -> [MemoEntry] {
+        var ordered = stored.filter { presentNames.contains($0.id) }
         let knownIDs = Set(ordered.map(\.id))
-        let newNames = presentNames.subtracting(knownIDs).sorted()
-        for name in newNames {
+        for name in presentNames.subtracting(knownIDs).sorted() {
             ordered.append(MemoEntry(id: name, isEnabled: true))
         }
+        return ordered
+    }
 
-        entries = ordered
-        saveEntries()
+    func memos(in subdirectory: String) -> [MemoEntry] {
+        folderEntries[subdirectory] ?? []
+    }
+
+    func memoCount(in subdirectory: String) -> Int {
+        folderEntries[subdirectory]?.count ?? 0
     }
 
     func setEnabled(id: String, enabled: Bool) {
-        guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
-        entries[idx].isEnabled = enabled
-        saveEntries()
+        setEnabled(id: id, in: currentSubdirectory, enabled: enabled)
     }
 
-    func move(from source: IndexSet, to destination: Int) {
-        entries.move(fromOffsets: source, toOffset: destination)
-        saveEntries()
+    func setEnabled(id: String, in subdirectory: String, enabled: Bool) {
+        var list = memos(in: subdirectory)
+        guard let idx = list.firstIndex(where: { $0.id == id }) else { return }
+        list[idx].isEnabled = enabled
+        apply(list, for: subdirectory)
+    }
+
+    /// `id` のメモを `targetID` の位置へ移す。左ペインのドラッグ並べ替え用。
+    func moveMemo(id: String, before targetID: String, in subdirectory: String) {
+        var list = memos(in: subdirectory)
+        guard let from = list.firstIndex(where: { $0.id == id }),
+              let to = list.firstIndex(where: { $0.id == targetID }),
+              from != to else { return }
+        let moved = list.remove(at: from)
+        list.insert(moved, at: to)
+        apply(list, for: subdirectory)
+    }
+
+    /// `offset` ぶん上下に動かす。右クリックメニューからの 1 つ移動用。
+    func moveMemo(id: String, by offset: Int, in subdirectory: String) {
+        var list = memos(in: subdirectory)
+        guard let from = list.firstIndex(where: { $0.id == id }) else { return }
+        let to = from + offset
+        guard list.indices.contains(to) else { return }
+        let moved = list.remove(at: from)
+        list.insert(moved, at: to)
+        apply(list, for: subdirectory)
+    }
+
+    /// 並び順・有効状態の更新をまとめて反映する唯一の窓口。
+    private func apply(_ list: [MemoEntry], for subdirectory: String) {
+        folderEntries[subdirectory] = list
+        if subdirectory == currentSubdirectory {
+            entries = list
+        }
+        saveEntries(list, for: subdirectory)
     }
 
     @discardableResult
@@ -214,10 +256,16 @@ final class MemoStore: ObservableObject {
     }
 
     func deleteMemo(id: String) {
-        flushPending(id: id)
-        let url = directoryURL.appendingPathComponent(id)
+        deleteMemo(id: id, in: currentSubdirectory)
+    }
+
+    func deleteMemo(id: String, in subdirectory: String) {
+        if subdirectory == currentSubdirectory {
+            flushPending(id: id)
+        }
+        let target = url(forRelativePath: subdirectory).appendingPathComponent(id)
         var resultingURL: NSURL?
-        try? FileManager.default.trashItem(at: url, resultingItemURL: &resultingURL)
+        try? FileManager.default.trashItem(at: target, resultingItemURL: &resultingURL)
         rescan()
     }
 
@@ -272,8 +320,8 @@ final class MemoStore: ObservableObject {
     }
 
     /// メモ本体を Finder で選択状態にして表示する。
-    func revealInFinder(memoID: String) {
-        let target = directoryURL.appendingPathComponent(memoID)
+    func revealInFinder(memoID: String, in subdirectory: String) {
+        let target = url(forRelativePath: subdirectory).appendingPathComponent(memoID)
         guard FileManager.default.fileExists(atPath: target.path) else { return }
         NSWorkspace.shared.activateFileViewerSelecting([target])
     }
@@ -330,10 +378,30 @@ final class MemoStore: ObservableObject {
         }
     }
 
+    /// フォルダを中身ごとゴミ箱へ移す。ルートは消させない。
+    func deleteSubdirectory(_ relativePath: String) {
+        guard !relativePath.isEmpty else { return }
+
+        if currentSubdirectory == relativePath || currentSubdirectory.hasPrefix(relativePath + "/") {
+            // 消えるフォルダに書き戻さないよう、保留中の書き込みは捨てる
+            pendingWrites.removeAll()
+            debounceTask?.cancel()
+        } else {
+            flushPending()
+        }
+
+        let target = url(forRelativePath: relativePath)
+        var resultingURL: NSURL?
+        try? FileManager.default.trashItem(at: target, resultingItemURL: &resultingURL)
+
+        // 選択中フォルダが消えた場合のルートへのフォールバックは rescan() が行う
+        rescan()
+    }
+
     func refreshAvailableSubdirectories() {
         let scan = Self.scanFolders(root: rootDirectoryURL)
         availableSubdirectories = scan.paths
-        memoCounts = scan.counts
+        folderMemoNames = scan.memoNames
 
         // 消えたフォルダの展開状態を残さない
         let valid = Set(availableSubdirectories)
@@ -354,10 +422,6 @@ final class MemoStore: ObservableObject {
 
     static func clampSidebarWidth(_ width: Double) -> Double {
         min(max(width, minSidebarWidth), maxSidebarWidth)
-    }
-
-    func memoCount(in relativePath: String) -> Int {
-        memoCounts[relativePath] ?? 0
     }
 
     func isExpanded(_ relativePath: String) -> Bool {
@@ -388,8 +452,8 @@ final class MemoStore: ObservableObject {
         }
     }
 
-    /// ルート配下を 1 度だけ走査して、フォルダの相対パスとフォルダごとのメモ数を同時に集める。
-    private static func scanFolders(root: URL) -> (paths: [String], counts: [String: Int]) {
+    /// ルート配下を 1 度だけ走査して、フォルダの相対パスとフォルダごとのファイル名を同時に集める。
+    private static func scanFolders(root: URL) -> (paths: [String], memoNames: [String: [String]]) {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -399,7 +463,7 @@ final class MemoStore: ObservableObject {
         }
         let rootPath = root.standardizedFileURL.path
         var paths: [String] = []
-        var counts: [String: Int] = [:]
+        var memoNames: [String: [String]] = [:]
         for case let url as URL in enumerator {
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             let path = url.standardizedFileURL.path
@@ -412,24 +476,27 @@ final class MemoStore: ObservableObject {
                 paths.append(rel)
             } else if supportedExtensions.contains(url.pathExtension.lowercased()) {
                 let parent = rel.split(separator: "/").dropLast().joined(separator: "/")
-                counts[parent, default: 0] += 1
+                memoNames[parent, default: []].append(url.lastPathComponent)
             }
         }
         paths.sort()
-        return (paths, counts)
+        for (folder, names) in memoNames {
+            memoNames[folder] = names.sorted()
+        }
+        return (paths, memoNames)
     }
 
-    private func loadStoredEntries() -> [MemoEntry] {
-        guard let data = UserDefaults.standard.data(forKey: Self.entriesKey(for: currentSubdirectory)),
+    private func loadStoredEntries(for subdirectory: String) -> [MemoEntry] {
+        guard let data = UserDefaults.standard.data(forKey: Self.entriesKey(for: subdirectory)),
               let decoded = try? JSONDecoder().decode([MemoEntry].self, from: data) else {
             return []
         }
         return decoded
     }
 
-    private func saveEntries() {
-        if let data = try? JSONEncoder().encode(entries) {
-            UserDefaults.standard.set(data, forKey: Self.entriesKey(for: currentSubdirectory))
+    private func saveEntries(_ list: [MemoEntry], for subdirectory: String) {
+        if let data = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(data, forKey: Self.entriesKey(for: subdirectory))
         }
     }
 }

@@ -8,14 +8,14 @@ description: IDE のファイルツリーのように、フォルダ階層とメ
 
 # フォルダツリー（左ペイン）
 
-サブフォルダが増えてくると、設定パネルのプルダウンから目的のフォルダを選び直すのが面倒になります。そこで、IDE やエディタのファイルツリーと同じように **フォルダ階層とメモを左ペインに出しっぱなし** にして、行をクリックした瞬間に切り替わるようにしました。
+サブフォルダが増えてくると、プルダウンから目的のフォルダを選び直すのが面倒になります。そこで、IDE やエディタのファイルツリーと同じように **フォルダ階層とメモを左ペインに出しっぱなし** にして、行をクリックした瞬間に切り替わるようにしました。
 
-あわせて、それまで設定パネルに同居していた **ファイル操作（作成・削除・Finder 表示・再スキャン）を左ペインへ集約** しています。設定パネルは「巡回の順番と巡回のしかた」だけを担当します。
+**メモに関する操作はすべてこのペインに集約**しています。かつて右側の分割パネルにあったファイル一覧・フォルダ選択・作成・並べ替えはここへ移り、アプリ全体に効く設定だけが[設定ページ](./settings-page.md)に残りました。
 
 | | 担当 |
 | --- | --- |
-| 左ペイン（フォルダツリー） | フォルダ移動、メモの選択、メモ／フォルダの作成、削除、Finder 表示、再スキャン |
-| 右ペイン（[設定パネル](./split-panel-settings.md)） | ローテーション順の並べ替え、巡回対象のオン/オフ、間隔・アイドル時間・画像切り替え |
+| 左ペイン（フォルダツリー） | フォルダ移動、メモの選択、作成、並べ替え、巡回対象のオン/オフ、削除、Finder 表示、再スキャン |
+| [設定ページ](./settings-page.md) | ローテーション間隔・アイドル時間・画像切り替えなど、フォルダによらない全体設定 |
 
 ## 使い方
 
@@ -24,7 +24,7 @@ description: IDE のファイルツリーのように、フォルダ階層とメ
 | 操作 | 動作 |
 | --- | --- |
 | フッター左端の `sidebar.left` ボタン | 左ペインの開閉 |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>1</kbd>（表示メニュー） | 同上。左ペインは作成の入口も兼ねるので、閉じていても呼び戻せるようにしてある |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>1</kbd>（表示メニュー） | 同上。左ペインは作成の入口も兼ねるので、閉じていても呼び戻せるようにしてある。[設定ページ](./settings-page.md)からも切り替えられる |
 | 左ペインと本文の境目をドラッグ | 幅を変更（140〜400pt） |
 
 表示状態・幅・どのフォルダを開いていたかは `UserDefaults` に保存され、次回起動時に復元されます。
@@ -34,10 +34,10 @@ description: IDE のファイルツリーのように、フォルダ階層とメ
 ```
 🏠 MemontoMori        3   ← （ルート）。右端の数字はそのフォルダのメモ数
   ▾ 📁 work           2
-      📁 standup      5
-        📄 daily.md       ← ローテーション対象フォルダのメモだけが並ぶ
-        📄 review.md
-        🌙 old.md         ← ローテーション対象外
+    ▸ 📁 standup      5   ← 開けばどのフォルダの中身も見られる
+      📄 daily.md
+      📄 review.md
+      🌙 old.md           ← ローテーション対象外
     📁 private        1
 ```
 
@@ -46,12 +46,19 @@ description: IDE のファイルツリーのように、フォルダ階層とメ
 | フォルダ行をクリック | そのフォルダへ即切り替え（`（ルート）` は `MemontoMori` の行） |
 | 選択中のフォルダ行をクリック | 折りたたみ／展開のトグル |
 | 三角（`>`） | 子フォルダ・メモの折りたたみ／展開 |
-| メモ行をクリック | 表示するメモを即切り替え |
+| メモ行をクリック | 表示するメモを即切り替え（別フォルダのメモなら、そのフォルダへ切り替えてから表示） |
+| メモ行をドラッグ | 同じフォルダ内でローテーション順を並べ替え |
 | ヘッダーの 4 ボタン | 新規メモ / 新規フォルダ / Finder で開く / 再スキャン |
-| フォルダ行を右クリック | このフォルダに切り替え、新規メモ、新規フォルダ、Finder で開く |
-| メモ行を右クリック | 表示する、ローテーションに含める・外す、Finder で表示、ゴミ箱へ |
+| フォルダ行を右クリック | このフォルダに切り替え、新規メモ、新規フォルダ、Finder で開く、フォルダをゴミ箱へ |
+| メモ行を右クリック | 表示する、ローテーションに含める・外す、上へ／下へ移動、Finder で表示、ゴミ箱へ |
 
-メモ行が並ぶのは **ローテーション対象フォルダ（選択中のフォルダ）だけ** です。並び順・有効状態はフォルダごとに独立して保存されているため（[サブフォルダの切り替え](./subdirectories.md)）、「いま巡回しているフォルダ」がひと目で分かる形にしています。他のフォルダは行の右端にメモ数だけを出し、クリックして切り替えると中身が展開されます。
+**どのフォルダも開閉できます。** 開けばその中のメモが並ぶので、切り替えなくても中身を確認できます。行の右端の数字は、そのフォルダが持つメモの件数です。
+
+ローテーションの対象になるのは選択中フォルダのメモだけですが、並び順と有効/無効は[フォルダごとに独立して保存](./subdirectories.md)されるため、他フォルダのメモも開いたまま並べ替え・オン/オフの変更ができます。
+
+:::caution フォルダの削除は中身ごと
+フォルダ行の「フォルダをゴミ箱へ」は、中のメモとサブフォルダをまとめてゴミ箱へ移します（確認ダイアログあり）。ルート行にはこの項目は出ません。削除したフォルダを選択中だった場合は、`rescan()` がルートへフォールバックします。
+:::
 
 ## 仕組み
 
@@ -88,32 +95,59 @@ struct SidebarRow: Identifiable, Equatable {
 }
 ```
 
-メモ行を供給するのはビュー側のクロージャなので、「対象フォルダだけメモを出す」という方針はモデルではなく `FolderSidebar` 側に閉じています。
+メモ行を供給するのはビュー側のクロージャです。
 
 ```swift title="FolderSidebar.swift（抜粋）"
 .rows(
     isExpanded: { store.isExpanded($0) },
     memoCount: { store.memoCount(in: $0) },
-    // メモを持てるのはローテーション対象フォルダだけなので、そこにだけ並べる。
-    memos: { $0 == store.currentSubdirectory ? store.entries : [] }
+    memos: { store.memos(in: $0) }
 )
 ```
 
-### メモ数は走査 1 回で数える
+### フォルダごとのメモ一覧を持つ
 
-フォルダ行の右端に出すメモ数のために毎回ディスクを見に行くと描画のたびに走査が走ってしまうため、フォルダ列挙と同じ 1 パスで数えて `memoCounts` に持たせています。
+どのフォルダも開けるようにするには、選択中フォルダ以外のメモ一覧も要ります。描画のたびにディスクを見に行かずに済むよう、**フォルダ走査と同じ 1 パスでファイル名も集め**、保存済みの並び順・有効状態と突き合わせた結果を `folderEntries` に保持します。
 
 ```swift title="MemoStore.swift（抜粋）"
-private static func scanFolders(root: URL) -> (paths: [String], counts: [String: Int]) {
-    ...
-    if isDir {
-        paths.append(rel)
-    } else if supportedExtensions.contains(url.pathExtension.lowercased()) {
-        let parent = rel.split(separator: "/").dropLast().joined(separator: "/")
-        counts[parent, default: 0] += 1
+/// フォルダごとのメモ一覧。キーはルートからの相対パス（ルートは空文字）。
+@Published private(set) var folderEntries: [String: [MemoEntry]] = [:]
+
+/// 保存済みの並び順・有効状態と、実在するファイルを突き合わせる。
+private static func merge(stored: [MemoEntry], presentNames: Set<String>) -> [MemoEntry] {
+    var ordered = stored.filter { presentNames.contains($0.id) }
+    let knownIDs = Set(ordered.map(\.id))
+    for name in presentNames.subtracting(knownIDs).sorted() {
+        ordered.append(MemoEntry(id: name, isEnabled: true))
+    }
+    return ordered
+}
+```
+
+`entries`（選択中フォルダの一覧＝ローテーション対象）は従来どおり残し、更新は `apply(_:for:)` 1 か所を通して `folderEntries`・`entries`・`UserDefaults` の 3 つを同時に書き換えます。どのフォルダのメモを操作しても状態がずれません。
+
+### 並べ替えはドラッグと右クリックの二本立て
+
+行の上に別の行がドラッグされてきた時点で入れ替える、よくある方式です。並べ替えは**同じフォルダの中だけ**に限定しています。
+
+```swift title="FolderSidebar.swift（抜粋）"
+private struct MemoReorderDropDelegate: DropDelegate {
+    let target: MemoRef
+    @Binding var dragging: MemoRef?
+    let onReorder: (MemoRef, MemoRef) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        // 並べ替えは同じフォルダの中だけ
+        dragging?.folder == target.folder
+    }
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging != target, dragging.folder == target.folder else { return }
+        onReorder(dragging, target)
     }
 }
 ```
+
+細かい調整をしたいときのために、右クリックメニューの「上へ移動 / 下へ移動」でも 1 つずつ動かせます。
 
 ### 展開状態と選択の同期
 
@@ -150,7 +184,7 @@ private func beginCreateMemo(in relativePath: String) {
 
 ### フッターを最下段いっぱいに移した理由
 
-左ペインはメモ本文の左に入るため、フッターをメモ列の中に置いたままだと、開閉のたびにトグルボタンが左右にずれてしまいます。そこでレイアウトを「横並び（左ペイン／本文／設定パネル）＋その下にフッター」に変更し、ボタン位置をウィンドウ左下に固定しました。
+左ペインはメモ本文の左に入るため、フッターをメモ列の中に置いたままだと、開閉のたびにトグルボタンが左右にずれてしまいます。そこでレイアウトを「横並び（左ペイン／本文）＋その下にフッター」に変更し、ボタン位置をウィンドウ左下に固定しました。
 
 ```swift title="ContentView.swift（抜粋）"
 VStack(spacing: 0) {
@@ -162,15 +196,10 @@ VStack(spacing: 0) {
             sidebarResizeHandle
         }
         mainArea.frame(minWidth: 320, maxWidth: .infinity)
-        if showsSettingsPanel { Divider(); SettingsView(..., embedded: true) }
     }
     Divider()
     footer
 }
 ```
 
-ウィンドウ最小幅は `本文 320 + (左ペイン幅 + 1) + (設定パネル 380)` として、開いているペインぶんだけ動的に広がります。
-
-:::caution 並べ替えは設定パネル側に残しています
-ローテーション順のドラッグ並べ替えはリスト表示のほうが扱いやすいため、[設定パネル](./split-panel-settings.md)に残しました。左ペインは「どれを見るか」、設定パネルは「どの順で巡回するか」という分担です。
-:::
+ウィンドウ最小幅は `本文 320 + (左ペイン幅 + 1)` として、左ペインを開いているぶんだけ動的に広がります。

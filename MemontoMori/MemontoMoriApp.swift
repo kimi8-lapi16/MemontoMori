@@ -36,6 +36,8 @@ struct MemontoMoriApp: App {
             }
             CommandGroup(replacing: .appSettings) {
                 Button("設定...") {
+                    store.flushPending()
+                    store.isShowingSettings = true
                     activateMainWindow()
                 }
                 .keyboardShortcut(",", modifiers: .command)
