@@ -23,8 +23,13 @@ graph TD
     CV --> Editor["FileMemoEditor<br/>(PlainTextEditor / NSTextView)"]
     CV --> Preview["MarkdownPreview<br/>(AttributedTextView)"]
     CV --> Settings["SettingsPage<br/>(本文エリアを差し替え)"]
+    CV --> Palette["CommandPalette<br/>(⌘P / ⇧⌘P のオーバーレイ)"]
 
     Sidebar --> Tree["FolderNode / SidebarRow<br/>(階層の組み立て)"]
+
+    Palette --> Fuzzy["FuzzyMatcher<br/>(fzf 風の曖昧一致)"]
+    Palette --> Catalog["CommandCatalog<br/>(コマンド定義)"]
+    Settings --> Catalog
 
     Preview --> MR["MarkdownRenderer"]
     Store --> FS[("~/Documents/MemontoMori/<br/>*.md / *.txt")]
@@ -37,12 +42,16 @@ graph TD
 | 型 | 種別 | 役割 |
 | --- | --- | --- |
 | `MemontoMoriApp` | `App` | エントリポイント。`MemoStore` と `RotationController` を生成し環境に注入。 |
-| `MemoStore` | `ObservableObject` | ファイルの読み書き、再スキャン、フォルダ別のメモ一覧管理、設定値の永続化。 |
+| `MemoStore` | `ObservableObject` | ファイルの読み書き、作成・リネーム・削除、再スキャン、フォルダ別のメモ一覧管理、設定値の永続化。 |
 | `RotationController` | `ObservableObject` | アイドル検知、自動ローテーション、表示中メモの管理。 |
 | `ContentView` | `View` | メイン UI。エディタ／プレビュー／設定ページの切り替えとフッター操作。 |
 | `SettingsPage` | `View` | 本文エリアを差し替えて表示する全体設定ページ。 |
 | `FolderSidebar` | `View` | 左ペイン。フォルダ／メモの切り替え、作成・並べ替え・削除・Finder 表示。 |
 | `FolderNode` / `SidebarRow` | `struct` | 相対パスの配列からフォルダ階層を組み立て、描画する行に平坦化。 |
+| `CommandPalette` | `View` | ⌘P / ⇧⌘P のオーバーレイ。ファイル検索とコマンド実行、作成・リネーム・削除の入力段階。 |
+| `CommandCatalog` / `CommandDescriptor` | `enum` + `struct` | 実行できるコマンドの定義。パレットと設定ページが同じ定義を読む。 |
+| `FuzzyMatcher` | `enum` | fzf 風のサブシーケンス照合。一致位置とスコアを返す。 |
+| `MemoLocation` | `struct` | 「どのフォルダのどのメモか」の参照（左ペインとパレットで共用）。 |
 | `MarkdownRenderer` | `enum` + パーサ | Markdown → `NSAttributedString` の自前変換。 |
 | `MenuBarController` | `class` | `NSStatusItem` と `NSPopover` の管理（メニューバー常駐）。 |
 | `MemoEntry` | `struct` | 1メモのメタ情報（`id` = ファイル名, `isEnabled`）。 |
@@ -85,5 +94,6 @@ sequenceDiagram
 
 - **メニューバー常駐**: `NSStatusItem` / `NSPopover`（SwiftUI の `MenuBarExtra` 以前からの実装）。
 - **テキスト編集**: `NSTextView` を `NSViewRepresentable` でラップし、スマートクオート等の自動置換を無効化（Markdown が壊れないように）。
+- **パレットの入力欄**: `NSTextField` をラップし、`doCommandBy` で ↑↓ / Tab / Enter / Esc を横取り（[Command Palette](./features/command-palette.md)）。
 - **最前面表示**: `NSWindow.level` を直接操作（[Always on Top](./features/always-on-top.md)）。
 - **入力監視**: `NSEvent.addLocalMonitorForEvents` でアイドル検知（[Memo Rotation](./features/memo-rotation.md)）。

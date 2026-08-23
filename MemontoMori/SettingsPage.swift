@@ -82,6 +82,26 @@ struct SettingsPage: View {
                     }
                 }
 
+                section("コマンド") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("⌘P でファイル・フォルダの絞り込み検索、⇧⌘P でコマンドの絞り込み実行を開きます。")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("検索欄の先頭が > のときはコマンド、そうでないときはファイル・フォルダの検索になります。"
+                            + "入力した文字が順番どおり含まれていれば拾う fzf 方式なので、"
+                            + "wsd と打つだけで work/standup/daily.md まで辿り着けます。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    keyHintTable
+
+                    ForEach(CommandCategory.allCases) { category in
+                        commandGroup(category)
+                    }
+                }
+
                 section("保存場所") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(store.rootDirectoryURL.path)
@@ -105,6 +125,74 @@ struct SettingsPage: View {
             .padding(28)
         }
         .background(Color(NSColor.textBackgroundColor))
+    }
+
+    /// パレットを開いている間だけ効くキー操作。コマンド一覧とは別枠で見せる。
+    private var keyHintTable: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("パレットのキー操作")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.secondary)
+            ForEach(CommandCatalog.keyHints) { hint in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(hint.keys)
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 130, alignment: .leading)
+                    Text(hint.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+
+    private func commandGroup(_ category: CommandCategory) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(category.label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.secondary)
+            ForEach(CommandCatalog.commands(in: category)) { descriptor in
+                commandRow(descriptor)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func commandRow(_ descriptor: CommandDescriptor) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: descriptor.systemImage)
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(descriptor.title)
+                    .font(.system(size: 13, weight: .medium))
+                Text(descriptor.summary)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 12)
+            if let shortcut = descriptor.shortcut {
+                Text(shortcut)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.primary.opacity(0.07))
+                    )
+            }
+        }
     }
 
     private var header: some View {

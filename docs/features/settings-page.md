@@ -39,6 +39,7 @@ graph LR
 | --- | --- |
 | ローテーション | 自動ローテーションのオン/オフ、[ローテーション間隔、アイドル時間](./memo-rotation.md) |
 | 表示 | [画像の切り替えアニメーション](./image-transition.md)、フォルダツリーの表示/非表示 |
+| コマンド | [コマンドパレット](./command-palette.md)で使えるコマンドの一覧とキー操作（設定項目ではなく早見表） |
 | 保存場所 | メモのルートフォルダのパス表示と Finder で開く |
 
 メモの作成・削除・並べ替え・巡回対象のオン/オフといった**フォルダ単位の操作は[左ペイン](./folder-sidebar.md)**にあります。
@@ -63,6 +64,20 @@ private var mainAreaContent: some View {
 ```
 
 タブのように「開きっぱなしにするもの」ではないので、この状態は `UserDefaults` に永続化していません（左ペインの表示状態や幅は永続化しています）。
+
+### コマンド一覧はカタログを読むだけ
+
+「コマンド」セクションは設定値を持ちません。[コマンドパレット](./command-palette.md)と同じ `CommandCatalog` を読んで、分類ごとにタイトル・説明・ショートカットを並べているだけの早見表です。コマンドを 1 つ足せば、パレットと設定ページの両方に自動で現れます。
+
+```swift title="SettingsPage.swift（抜粋）"
+section("コマンド") {
+    // ...
+    keyHintTable
+    ForEach(CommandCategory.allCases) { category in
+        commandGroup(category)
+    }
+}
+```
 
 ### 開いている間もローテーションは止めない
 

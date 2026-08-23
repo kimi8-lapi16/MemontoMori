@@ -42,6 +42,46 @@ struct MemontoMoriApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
+            // ⌘P はパレットに使うので、このアプリでは出番のない「プリント」を外す。
+            CommandGroup(replacing: .printItem) {}
+            CommandMenu("コマンド") {
+                Button("ファイル・フォルダを検索...") {
+                    store.togglePalette(.files)
+                    activateMainWindow()
+                }
+                .keyboardShortcut("p", modifiers: .command)
+
+                Button("コマンドを実行...") {
+                    store.togglePalette(.commands)
+                    activateMainWindow()
+                }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("新規メモ...") {
+                    store.togglePalette(.newMemo)
+                    activateMainWindow()
+                }
+                Button("新規フォルダ...") {
+                    store.togglePalette(.newFolder)
+                    activateMainWindow()
+                }
+
+                Divider()
+
+                Button("前のメモへ") {
+                    rotation.advance(by: -1, userInitiated: true)
+                }
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+                .disabled(store.enabledEntries.count < 2)
+
+                Button("次のメモへ") {
+                    rotation.advance(by: 1, userInitiated: true)
+                }
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                .disabled(store.enabledEntries.count < 2)
+            }
         }
     }
 

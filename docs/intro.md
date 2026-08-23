@@ -24,6 +24,7 @@ keywords: [macOS, menu bar, SwiftUI, memo, screensaver, markdown]
 - 📝 メニューバーのアイコンから、Markdown / プレーンテキストのメモをその場で編集。
 - 🔄 アイドル状態が続くと、有効なメモを設定間隔で自動巡回表示。
 - 👁️ `.md` ファイルはワンクリックで **編集 ⇄ プレビュー** を切り替え。
+- ⌘P で **fzf 風の絞り込み検索**、⇧⌘P で作成・リネーム・削除まで **コマンドで実行**。
 
 ## 主な機能
 
@@ -33,6 +34,7 @@ keywords: [macOS, menu bar, SwiftUI, memo, screensaver, markdown]
 | メモのローテーション表示 | アイドル検知 → 自動巡回 | [Memo Rotation](./features/memo-rotation.md) |
 | サブフォルダ切り替え | ローテーション対象ディレクトリを選択 | [Subdirectories](./features/subdirectories.md) |
 | フォルダツリー（左ペイン） | 階層とメモの一覧・切り替え・作成・削除 | [Folder Sidebar](./features/folder-sidebar.md) |
+| コマンドパレット | ⌘P で fzf 風のファイル検索、⇧⌘P でコマンド実行 | [Command Palette](./features/command-palette.md) |
 | Markdown プレビュー | 自前パーサで `NSAttributedString` 描画 | [Markdown Preview](./features/markdown-preview.md) |
 | 設定ページ | 本文エリアを差し替えて全体設定を表示 | [Settings Page](./features/settings-page.md) |
 | DMG 配布 / リリース | ローカルビルド & GitHub Actions | [Build & Release](./development/build-and-release.md) |

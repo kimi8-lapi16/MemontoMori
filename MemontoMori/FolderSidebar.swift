@@ -15,9 +15,11 @@ struct FolderSidebar: View {
     @State private var showingNewFolderSheet: Bool = false
     @State private var newFolderName: String = ""
     @State private var errorMessage: String?
-    @State private var pendingDeleteMemo: MemoRef?
+    @State private var pendingDeleteMemo: MemoLocation?
     @State private var pendingDeleteFolder: String?
-    @State private var draggingMemo: MemoRef?
+    @State private var draggingMemo: MemoLocation?
+    @State private var renameTarget: RenameTarget?
+    @State private var renameText: String = ""
 
     private var rows: [SidebarRow] {
         FolderNode
@@ -52,7 +54,7 @@ struct FolderSidebar: View {
         .sheet(isPresented: $showingNewMemoSheet) {
             NameInputSheet(
                 title: "新規メモ",
-                caption: "拡張子を省略すると .md として作成されます。",
+                caption: "拡張子を省略すると .md、work/todo のように書くと途中のフォルダも作られます。",
                 locationLabel: currentLocationLabel,
                 placeholder: "ファイル名",
                 text: $newMemoName,
@@ -66,7 +68,7 @@ struct FolderSidebar: View {
         .sheet(isPresented: $showingNewFolderSheet) {
             NameInputSheet(
                 title: "新規フォルダ",
-                caption: nil,
+                caption: "a/b のように書くと階層をまとめて作れます。",
                 locationLabel: currentLocationLabel,
                 placeholder: "フォルダ名",
                 text: $newFolderName,
@@ -75,6 +77,23 @@ struct FolderSidebar: View {
                     newFolderName = ""
                 },
                 onCreate: createFolder
+            )
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { renameTarget != nil },
+                set: { if !$0 { cancelRename() } }
+            )
+        ) {
+            NameInputSheet(
+                title: renameTarget?.sheetTitle ?? "名前を変更",
+                caption: renameTarget?.sheetCaption,
+                locationLabel: renameTarget?.locationLabel ?? currentLocationLabel,
+                placeholder: "新しい名前",
+                confirmLabel: "変更",
+                text: $renameText,
+                onCancel: cancelRename,
+                onCreate: performRename
             )
         }
         .alert(
@@ -184,11 +203,13 @@ struct FolderSidebar: View {
                 onNewMemo: { beginCreateMemo(in: row.folderPath) },
                 onNewFolder: { beginCreateFolder(in: row.folderPath) },
                 onReveal: { store.revealInFinder(relativePath: row.folderPath) },
+                canRename: !isRoot,
+                onRename: { beginRename(folder: row.folderPath) },
                 canDelete: !isRoot,
                 onDelete: { pendingDeleteFolder = row.folderPath }
             )
         case let .memo(isEnabled):
-            let ref = MemoRef(folder: row.folderPath, name: row.name)
+            let ref = MemoLocation(folder: row.folderPath, name: row.name)
             MemoRowView(
                 fileName: row.name,
                 depth: row.depth,
@@ -205,6 +226,7 @@ struct FolderSidebar: View {
                 onMoveUp: { moveMemo(ref, by: -1) },
                 onMoveDown: { moveMemo(ref, by: 1) },
                 onReveal: { store.revealInFinder(memoID: ref.name, in: ref.folder) },
+                onRename: { beginRename(memo: ref) },
                 onDelete: { pendingDeleteMemo = ref }
             )
             .onDrag {
@@ -229,7 +251,7 @@ struct FolderSidebar: View {
         store.currentSubdirectory.isEmpty ? "（ルート）" : store.currentSubdirectory
     }
 
-    private func isCurrentMemo(_ ref: MemoRef) -> Bool {
+    private func isCurrentMemo(_ ref: MemoLocation) -> Bool {
         ref.folder == store.currentSubdirectory && ref.name == rotation.currentID
     }
 
@@ -245,19 +267,19 @@ struct FolderSidebar: View {
     }
 
     /// 別フォルダのメモを開くときは、そのフォルダをローテーション対象にしてから表示を移す。
-    private func openMemo(_ ref: MemoRef) {
+    private func openMemo(_ ref: MemoLocation) {
         store.isShowingSettings = false
         selectFolderIfNeeded(ref.folder)
         rotation.switchTo(id: ref.name)
     }
 
-    private func canMove(_ ref: MemoRef, by offset: Int) -> Bool {
+    private func canMove(_ ref: MemoLocation, by offset: Int) -> Bool {
         let list = store.memos(in: ref.folder)
         guard let index = list.firstIndex(where: { $0.id == ref.name }) else { return false }
         return list.indices.contains(index + offset)
     }
 
-    private func moveMemo(_ ref: MemoRef, by offset: Int) {
+    private func moveMemo(_ ref: MemoLocation, by offset: Int) {
         store.moveMemo(id: ref.name, by: offset, in: ref.folder)
         rotation.reconcile()
     }
@@ -295,6 +317,48 @@ struct FolderSidebar: View {
         }
     }
 
+    private func beginRename(memo ref: MemoLocation) {
+        renameText = ref.name
+        renameTarget = .memo(ref)
+    }
+
+    private func beginRename(folder relativePath: String) {
+        guard !relativePath.isEmpty else { return }
+        renameText = FolderNode.leafName(of: relativePath)
+        renameTarget = .folder(relativePath)
+    }
+
+    private func cancelRename() {
+        renameTarget = nil
+        renameText = ""
+    }
+
+    private func performRename() {
+        guard let target = renameTarget else { return }
+        switch target {
+        case let .memo(ref):
+            switch store.renameMemo(id: ref.name, in: ref.folder, to: renameText) {
+            case .success(let renamed):
+                cancelRename()
+                rotation.reconcile()
+                // 表示中のメモを変えた場合に、旧名のまま取り残されないよう追従させる。
+                if renamed.folder == store.currentSubdirectory {
+                    rotation.switchTo(id: renamed.name)
+                }
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
+        case let .folder(path):
+            switch store.renameSubdirectory(path, to: renameText) {
+            case .success:
+                cancelRename()
+                rotation.reconcile()
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     private func createFolder() {
         switch store.createSubdirectory(name: newFolderName) {
         case .success:
@@ -307,17 +371,38 @@ struct FolderSidebar: View {
     }
 }
 
-/// 「どのフォルダのどのメモか」を 1 つにまとめた参照。
-private struct MemoRef: Equatable {
-    let folder: String
-    let name: String
+/// リネーム対象。メモとフォルダで同じシートを使い回すためにまとめている。
+private enum RenameTarget: Equatable {
+    case memo(MemoLocation)
+    case folder(String)
+
+    var sheetTitle: String {
+        switch self {
+        case .memo: return "メモの名前を変更"
+        case .folder: return "フォルダの名前を変更"
+        }
+    }
+
+    var sheetCaption: String? {
+        switch self {
+        case .memo: return "拡張子を省略すると、元の拡張子のままになります。"
+        case .folder: return "中のメモの並び順やローテーション設定はそのまま移ります。"
+        }
+    }
+
+    var locationLabel: String {
+        switch self {
+        case let .memo(ref): return ref.path
+        case let .folder(path): return path
+        }
+    }
 }
 
 /// 行の上に別の行がドラッグされてきた時点で並べ替える、よくある方式のドロップ処理。
 private struct MemoReorderDropDelegate: DropDelegate {
-    let target: MemoRef
-    @Binding var dragging: MemoRef?
-    let onReorder: (MemoRef, MemoRef) -> Void
+    let target: MemoLocation
+    @Binding var dragging: MemoLocation?
+    let onReorder: (MemoLocation, MemoLocation) -> Void
 
     func validateDrop(info: DropInfo) -> Bool {
         // 並べ替えは同じフォルダの中だけ
@@ -353,6 +438,9 @@ private struct FolderRowView: View {
     let onNewMemo: () -> Void
     let onNewFolder: () -> Void
     let onReveal: () -> Void
+    /// ルートは名前を変えさせない。
+    let canRename: Bool
+    let onRename: () -> Void
     /// ルートは削除させない。
     let canDelete: Bool
     let onDelete: () -> Void
@@ -396,6 +484,9 @@ private struct FolderRowView: View {
             Divider()
             Button("新規メモ...", action: onNewMemo)
             Button("新規フォルダ...", action: onNewFolder)
+            if canRename {
+                Button("名前を変更...", action: onRename)
+            }
             Divider()
             Button("Finder で開く", action: onReveal)
             if canDelete {
@@ -423,6 +514,7 @@ private struct MemoRowView: View {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onReveal: () -> Void
+    let onRename: () -> Void
     let onDelete: () -> Void
 
     @State private var isHovering: Bool = false
@@ -470,6 +562,7 @@ private struct MemoRowView: View {
             Button("下へ移動", action: onMoveDown)
                 .disabled(!canMoveDown)
             Divider()
+            Button("名前を変更...", action: onRename)
             Button("Finder で表示", action: onReveal)
             Button("ゴミ箱へ", role: .destructive, action: onDelete)
         }
@@ -535,6 +628,7 @@ private struct NameInputSheet: View {
     let caption: String?
     let locationLabel: String
     let placeholder: String
+    var confirmLabel: String = "作成"
     @Binding var text: String
     let onCancel: () -> Void
     let onCreate: () -> Void
@@ -558,7 +652,7 @@ private struct NameInputSheet: View {
                 Spacer()
                 Button("キャンセル", action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button("作成", action: onCreate)
+                Button(confirmLabel, action: onCreate)
                     .keyboardShortcut(.defaultAction)
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
