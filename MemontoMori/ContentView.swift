@@ -5,9 +5,7 @@ struct ContentView: View {
     @EnvironmentObject private var store: MemoStore
     @EnvironmentObject private var rotation: RotationController
 
-    @State private var isPinned: Bool = false
     @State private var freeMemoText: String = ""
-    @State private var isPreviewing: Bool = false
 
     /// 実際に画面へ出しているメモの ID。`rotation.currentID` の変更を
     /// `withAnimation` 経由で反映するために分離している（画像切り替えアニメーション用）。
@@ -42,11 +40,19 @@ struct ContentView: View {
                 .background(Color(NSColor.windowBackgroundColor))
         }
         .frame(minWidth: minWindowWidth, minHeight: 260)
-        .background(WindowAccessor(isPinned: $isPinned))
+        .background(WindowAccessor(isPinned: store.isPinned))
         .animation(.easeInOut(duration: 0.18), value: store.folderSidebarVisible)
         .onChange(of: rotation.currentID) { oldValue, newValue in
             updateDisplayedID(from: oldValue, to: newValue)
         }
+        // パレットはフッターも含めたウィンドウ全体に重ねる。
+        .overlay {
+            if store.paletteMode != nil {
+                CommandPalette(store: store, rotation: rotation)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: store.paletteMode)
     }
 
     private var minWindowWidth: CGFloat {
@@ -124,7 +130,7 @@ struct ContentView: View {
                 FileImageViewer(id: id)
                     .id(id)
                     .transition(store.imageTransition.transition)
-            } else if isPreviewing && isMarkdownFile(id) {
+            } else if store.isPreviewing && isMarkdownFile(id) {
                 MarkdownPreview(id: id)
                     .id("preview:" + id)
             } else {
@@ -202,12 +208,12 @@ struct ContentView: View {
 
     private var pinButton: some View {
         Button {
-            isPinned.toggle()
+            store.isPinned.toggle()
         } label: {
-            Image(systemName: isPinned ? "pin.fill" : "pin")
+            Image(systemName: store.isPinned ? "pin.fill" : "pin")
         }
         .buttonStyle(.borderless)
-        .help(isPinned ? "最前面表示を解除" : "常に最前面に表示")
+        .help(store.isPinned ? "最前面表示を解除" : "常に最前面に表示")
     }
 
     private var rotationToggleButton: some View {
@@ -229,16 +235,16 @@ struct ContentView: View {
     private var previewToggleButton: some View {
         if !store.isShowingSettings, let id = rotation.currentID, isMarkdownFile(id) {
             Button {
-                if !isPreviewing {
+                if !store.isPreviewing {
                     store.flushPending()
                 }
-                isPreviewing.toggle()
+                store.isPreviewing.toggle()
             } label: {
-                Image(systemName: isPreviewing ? "pencil" : "eye")
-                    .foregroundColor(isPreviewing ? .accentColor : .secondary)
+                Image(systemName: store.isPreviewing ? "pencil" : "eye")
+                    .foregroundColor(store.isPreviewing ? .accentColor : .secondary)
             }
             .buttonStyle(.borderless)
-            .help(isPreviewing ? "編集モードに戻る" : "Markdown プレビュー")
+            .help(store.isPreviewing ? "編集モードに戻る" : "Markdown プレビュー")
         }
     }
 
@@ -470,7 +476,8 @@ private struct PlainTextEditor: NSViewRepresentable {
 }
 
 private struct WindowAccessor: NSViewRepresentable {
-    @Binding var isPinned: Bool
+    /// 読むだけなので値で受ける（実体は `MemoStore.isPinned`）。
+    let isPinned: Bool
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()

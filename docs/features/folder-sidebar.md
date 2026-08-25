@@ -49,8 +49,10 @@ description: IDE のファイルツリーのように、フォルダ階層とメ
 | メモ行をクリック | 表示するメモを即切り替え（別フォルダのメモなら、そのフォルダへ切り替えてから表示） |
 | メモ行をドラッグ | 同じフォルダ内でローテーション順を並べ替え |
 | ヘッダーの 4 ボタン | 新規メモ / 新規フォルダ / Finder で開く / 再スキャン |
-| フォルダ行を右クリック | このフォルダに切り替え、新規メモ、新規フォルダ、Finder で開く、フォルダをゴミ箱へ |
-| メモ行を右クリック | 表示する、ローテーションに含める・外す、上へ／下へ移動、Finder で表示、ゴミ箱へ |
+| フォルダ行を右クリック | このフォルダに切り替え、新規メモ、新規フォルダ、名前を変更、Finder で開く、フォルダをゴミ箱へ |
+| メモ行を右クリック | 表示する、ローテーションに含める・外す、上へ／下へ移動、名前を変更、Finder で表示、ゴミ箱へ |
+
+同じ操作は[コマンドパレット](./command-palette.md)（<kbd>⇧</kbd><kbd>⌘</kbd><kbd>P</kbd>）からも実行できます。左ペインを閉じていても、キーボードだけで作成・リネーム・削除まで届きます。
 
 **どのフォルダも開閉できます。** 開けばその中のメモが並ぶので、切り替えなくても中身を確認できます。行の右端の数字は、そのフォルダが持つメモの件数です。
 
@@ -170,7 +172,7 @@ Finder でフォルダを消した場合は、`refreshAvailableSubdirectories()`
 
 ### 作成は「現在のフォルダ」に対して行う
 
-`MemoStore.createMemo(name:)` / `createSubdirectory(name:)` はどちらも `directoryURL`（= 選択中のフォルダ）に作ります。そのため、別フォルダの行から作成を呼んだときは **先にそのフォルダへ切り替えてからシートを出す** 形にしました。ストア側に「作成先フォルダ」を引数で持ち込まずに済み、作成後の表示先とも食い違いません。
+`MemoStore.createMemo(name:)` / `createSubdirectory(name:)` はどちらも `directoryURL`（= 選択中のフォルダ）に作ります（内部では、パスを書ける `createMemo(relativePath:)` / `createFolder(relativePath:)` に委譲しています）。そのため、別フォルダの行から作成を呼んだときは **先にそのフォルダへ切り替えてからシートを出す** 形にしました。ストア側に「作成先フォルダ」を引数で持ち込まずに済み、作成後の表示先とも食い違いません。
 
 ```swift title="FolderSidebar.swift（抜粋）"
 private func beginCreateMemo(in relativePath: String) {
@@ -181,6 +183,21 @@ private func beginCreateMemo(in relativePath: String) {
 ```
 
 新規メモの作成が成功すると、そのままそのメモへ表示を移します（`rotation.switchTo(id:)`）。
+
+### リネームは作成と同じシートを使い回す
+
+「名前を変更...」はメモとフォルダで対象が違うだけなので、`RenameTarget` にまとめて `NameInputSheet` を共用しています（確定ボタンのラベルだけ「変更」に差し替え）。リネームで並び順やローテーション対象の設定が飛ばないようにする仕掛けは、[コマンドパレット](./command-palette.md)の解説にまとめてあります。
+
+```swift title="FolderSidebar.swift（抜粋）"
+private enum RenameTarget: Equatable {
+    case memo(MemoLocation)
+    case folder(String)
+}
+```
+
+:::note MemoRef は MemoLocation になりました
+「どのフォルダのどのメモか」を指す型は、左ペインとコマンドパレットの両方から使うため `MemoStore.swift` の `MemoLocation` に移してあります（中身は同じ `folder` + `name`）。
+:::
 
 ### フッターを最下段いっぱいに移した理由
 
